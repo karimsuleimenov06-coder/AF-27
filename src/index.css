@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+@theme {
+  --color-night: #070a14;
+  --color-night-2: #0d1224;
+  --color-surface: #141b32;
+  --color-surface-2: #1c2542;
+  --color-border: #2a3557;
+  --color-gold: #ffb92e;
+  --color-gold-2: #ffd980;
+  --color-cyan: #2dd6f0;
+  --color-violet: #6d5bff;
+  --color-emerald: #34d399;
+  --color-danger: #ef4444;
+  --color-ink: #aab3d1;
+  --color-ink-2: #6a749c;
+  --color-bronze: #c97b45;
+  --color-bronze-2: #8a5227;
+  --color-silver: #b9c3da;
+  --color-silver-2: #7c88a6;
+
+  --font-display: "Rajdhani", "Inter", sans-serif;
+  --font-sans: "Inter", sans-serif;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    background: var(--color-night);
+    color: white;
+    font-family: var(--font-sans);
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+}
+
+@keyframes goalFlash {
+  0% {
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes rotateHint {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(90deg);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.85) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-left {
+    padding-left: env(safe-area-inset-left);
+  }
+  .safe-right {
+    padding-right: env(safe-area-inset-right);
+  }
+}
