@@ -324,8 +324,14 @@ export function stepMatch(state: MatchState, dt: number, input: MatchInput, now:
       const len = Math.hypot(input.moveX, input.moveY)
       if (len > 0.05) {
         const speed = maxSpeed(p, input.sprint)
-        p.vx = (input.moveX / len) * speed
-        p.vy = (input.moveY / len) * speed
+        // The match camera is a fixed sideline camera (see render3d.ts): on
+        // screen, pitch-length (sim y) reads as left/right and pitch-width
+        // (sim x) reads as near/far. So joystick "right" (moveX) must drive
+        // sim y, and joystick "up" (moveY) must drive sim x — mapping the
+        // stick straight to sim x/y (as before) made sideways input look
+        // like forward/backward motion instead.
+        p.vx = (-input.moveY / len) * speed
+        p.vy = (-input.moveX / len) * speed
         p.x = clamp(p.x + p.vx * dt, 1, PITCH.width - 1)
         p.y = clamp(p.y + p.vy * dt, 1, PITCH.length - 1)
       } else {
