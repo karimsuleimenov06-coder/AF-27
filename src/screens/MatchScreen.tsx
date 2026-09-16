@@ -156,6 +156,11 @@ export default function MatchScreen() {
           else playConcede()
           setGoalFlash(event.team)
           setTimeout(() => setGoalFlash(null), 900)
+          if (event.team) {
+            for (const p of state.players) {
+              if (p.team === event.team && !p.sentOff) renderer.playAction(p.id, 'celebrate')
+            }
+          }
         } else if (event.kind === 'yellow' || event.kind === 'red') {
           playCard()
         } else if (event.kind === 'whistle' || event.kind === 'corner' || event.kind === 'penalty' || event.kind === 'ht' || event.kind === 'ft') {
@@ -166,10 +171,14 @@ export default function MatchScreen() {
       const currentOwner = state.ball.ownerId
       if (prevBallOwnerRef.current && !currentOwner) {
         playKick()
+        renderer.playAction(prevBallOwnerRef.current, 'kick')
       } else if (prevBallOwnerRef.current && currentOwner && prevBallOwnerRef.current !== currentOwner) {
         const prevTeam = state.players.find((p) => p.id === prevBallOwnerRef.current)?.team
-        const nextTeam = state.players.find((p) => p.id === currentOwner)?.team
-        if (prevTeam && nextTeam && prevTeam !== nextTeam) playTackle()
+        const nextPlayer = state.players.find((p) => p.id === currentOwner)
+        if (prevTeam && nextPlayer && prevTeam !== nextPlayer.team) {
+          playTackle()
+          renderer.playAction(currentOwner, nextPlayer.isGK ? 'save' : 'tackle')
+        }
       }
       prevBallOwnerRef.current = currentOwner
 

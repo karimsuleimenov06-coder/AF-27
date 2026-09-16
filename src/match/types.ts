@@ -54,6 +54,10 @@ export interface Ball {
   vy: number
   ownerId: string | null
   lastTouchTeam: Team | null
+  /** Guards the goalkeeper save check so a single shot is only judged once,
+   * even though the ball may satisfy the "in range" test for several frames
+   * while it closes in on goal. Reset whenever the ball is kicked afresh. */
+  shotResolved: boolean
 }
 
 export interface MatchEvent {

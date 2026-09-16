@@ -1,6 +1,52 @@
 import * as THREE from 'three'
 import { PITCH, type MatchState } from './types'
 
+// --- Animation ---------------------------------------------------------
+// Two layers, applied in order every frame:
+//  1. Locomotion — continuous, driven by current speed (see `intensity` in
+//     MatchRenderer3D.render): blends smoothly from idle through jog to
+//     sprint. Always running, needs no trigger.
+//  2. Action poses — short, one-shot overrides triggered by gameplay events
+//     (see `playAction`) that win over the locomotion pose for their
+//     duration, then hand back control automatically. This is deliberately
+//     a small, easy-to-extend set (kick/tackle/save/celebrate) rather than
+//     a full animation system — adding a new one is just another case in
+//     `applyActionPose` plus a `playAction(id, '...')` call at the moment
+//     it happens (see MatchScreen's event loop for how kick/tackle already
+//     hook in). Fall/jump/slide follow the same pattern when needed.
+export type PlayerAction = 'kick' | 'tackle' | 'save' | 'celebrate'
+
+interface ActiveAction {
+  type: PlayerAction
+  startedAt: number
+  duration: number
+}
+
+function applyActionPose(parts: PlayerParts, action: PlayerAction, t: number) {
+  const swing = Math.sin(Math.min(1, t) * Math.PI) // 0 -> 1 -> 0 envelope over the action's duration
+  switch (action) {
+    case 'kick':
+      parts.legR.rotation.x = -0.8 + swing * 1.7
+      parts.torso.rotation.x = -swing * 0.18
+      break
+    case 'tackle':
+      parts.torso.rotation.x = 0.55 * swing
+      parts.legL.rotation.x = -0.6 * swing
+      parts.legR.rotation.x = 0.95 * swing
+      break
+    case 'save':
+      parts.armL.rotation.z = 0.9 * swing
+      parts.armR.rotation.z = -0.9 * swing
+      parts.torso.rotation.x = -0.3 * swing
+      break
+    case 'celebrate':
+      parts.armL.rotation.x = -2.3 * swing
+      parts.armR.rotation.x = -2.3 * swing
+      parts.torso.position.y = TORSO_BASE_Y + Math.abs(Math.sin(t * Math.PI * 3)) * 0.14
+      break
+  }
+}
+
 export interface Quality3D {
   shadows: boolean
   shadowMapSize: number
@@ -27,10 +73,58 @@ interface PlayerParts {
 }
 
 const TORSO_BASE_Y = 1.05
-const HOME_COLOR = 0x2dd6f0
-const AWAY_COLOR = 0xef4444
-const GK_HOME_COLOR = 0xffd980
-const GK_AWAY_COLOR = 0xfb923c
+const SKIN_COLOR = 0xf1c27d
+const HAIR_COLOR = 0x241a12
+const BOOT_COLOR = 0x0f1116
+
+interface KitColors {
+  jersey: number
+  shorts: number
+  socks: number
+}
+
+const KITS: Record<'home' | 'away' | 'gkHome' | 'gkAway', KitColors> = {
+  home: { jersey: 0x2dd6f0, shorts: 0x0e1730, socks: 0x2dd6f0 },
+  away: { jersey: 0xef4444, shorts: 0x141414, socks: 0xef4444 },
+  gkHome: { jersey: 0xffd980, shorts: 0x1c2542, socks: 0xffd980 },
+  gkAway: { jersey: 0xfb923c, shorts: 0x1c2542, socks: 0xfb923c },
+}
+
+// Geometry is expensive to duplicate per player (22 players x ~13 meshes
+// each); every player shares the same handful of BufferGeometry instances
+// and only the materials (which carry the kit colour) differ.
+const GEO = {
+  head: new THREE.SphereGeometry(0.29, 12, 10),
+  hair: new THREE.SphereGeometry(0.3, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2.1),
+  torso: new THREE.CapsuleGeometry(0.36, 0.42, 4, 8),
+  shorts: new THREE.CapsuleGeometry(0.39, 0.14, 3, 8),
+  sleeve: new THREE.CapsuleGeometry(0.105, 0.16, 3, 6),
+  forearm: new THREE.CapsuleGeometry(0.09, 0.3, 3, 6),
+  thigh: new THREE.CapsuleGeometry(0.145, 0.28, 3, 6),
+  shin: new THREE.CapsuleGeometry(0.115, 0.36, 3, 6),
+  boot: new THREE.BoxGeometry(0.18, 0.13, 0.34),
+}
+
+const MATERIALS = {
+  skin: new THREE.MeshStandardMaterial({ color: SKIN_COLOR, roughness: 0.8 }),
+  hair: new THREE.MeshStandardMaterial({ color: HAIR_COLOR, roughness: 0.6 }),
+  boot: new THREE.MeshStandardMaterial({ color: BOOT_COLOR, roughness: 0.4 }),
+}
+
+const kitMaterialCache = new Map<string, { jersey: THREE.MeshStandardMaterial; shorts: THREE.MeshStandardMaterial; socks: THREE.MeshStandardMaterial }>()
+
+function getKitMaterials(kit: KitColors, key: string) {
+  let mats = kitMaterialCache.get(key)
+  if (!mats) {
+    mats = {
+      jersey: new THREE.MeshStandardMaterial({ color: kit.jersey, roughness: 0.65 }),
+      shorts: new THREE.MeshStandardMaterial({ color: kit.shorts, roughness: 0.65 }),
+      socks: new THREE.MeshStandardMaterial({ color: kit.socks, roughness: 0.65 }),
+    }
+    kitMaterialCache.set(key, mats)
+  }
+  return mats
+}
 
 function toWorld(x: number, y: number) {
   return { x: x - PITCH.width / 2, z: y - PITCH.length / 2 }
@@ -112,60 +206,80 @@ function createStandTexture(): THREE.CanvasTexture {
   return tex
 }
 
-function buildLimb(color: number, radius: number, length: number): THREE.Mesh {
-  const geo = new THREE.CapsuleGeometry(radius, length, 3, 6)
-  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.7 })
+/** Places a capsule mesh so its rounded top sits at `topY` (in the parent's
+ * local space) and it extends straight down from there — lets body segments
+ * (thigh -> shin -> boot, sleeve -> forearm) be chained without gaps. */
+function attachSegment(parent: THREE.Object3D, geo: THREE.BufferGeometry, mat: THREE.Material, topY: number, length: number, radius: number) {
   const mesh = new THREE.Mesh(geo, mat)
-  mesh.position.y = -length / 2 - radius
+  mesh.position.y = topY - length / 2 - radius
   mesh.castShadow = true
+  parent.add(mesh)
   return mesh
 }
 
 function buildPlayerMesh(team: 'home' | 'away', isGK: boolean): THREE.Group {
   const group = new THREE.Group()
-  const color = isGK ? (team === 'home' ? GK_HOME_COLOR : GK_AWAY_COLOR) : team === 'home' ? HOME_COLOR : AWAY_COLOR
-  const skin = 0xf1c27d
+  const kitKey = isGK ? (team === 'home' ? 'gkHome' : 'gkAway') : team
+  const kit = KITS[kitKey]
+  const mats = getKitMaterials(kit, kitKey)
+
+  // Shorts sit fixed at the hip — they don't swing with the running legs.
+  attachSegment(group, GEO.shorts, mats.shorts, TORSO_BASE_Y + 0.16, 0.1, 0.35)
 
   const torso = new THREE.Group()
   torso.name = 'torso'
   torso.position.y = TORSO_BASE_Y
   group.add(torso)
 
-  const bodyGeo = new THREE.CapsuleGeometry(0.4, 0.55, 4, 8)
-  const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.05 })
-  const body = new THREE.Mesh(bodyGeo, bodyMat)
+  const body = new THREE.Mesh(GEO.torso, mats.jersey)
+  body.position.y = 0.28
   body.castShadow = true
   torso.add(body)
 
-  const headGeo = new THREE.SphereGeometry(0.3, 10, 10)
-  const headMat = new THREE.MeshStandardMaterial({ color: skin, roughness: 0.8 })
-  const head = new THREE.Mesh(headGeo, headMat)
-  head.position.y = 0.75
+  const hair = new THREE.Mesh(GEO.hair, MATERIALS.hair)
+  hair.position.y = 0.86
+  hair.castShadow = true
+  torso.add(hair)
+
+  const head = new THREE.Mesh(GEO.head, MATERIALS.skin)
+  head.position.y = 0.85
   head.castShadow = true
   torso.add(head)
 
   const legL = new THREE.Group()
   legL.name = 'legL'
-  legL.position.set(-0.16, 0.7, 0)
-  legL.add(buildLimb(0x1c2542, 0.13, 0.7))
+  legL.position.set(-0.17, TORSO_BASE_Y, 0)
+  attachSegment(legL, GEO.thigh, MATERIALS.skin, 0, 0.26, 0.13)
+  attachSegment(legL, GEO.shin, mats.socks, -0.52, 0.3, 0.1)
+  const bootL = new THREE.Mesh(GEO.boot, MATERIALS.boot)
+  bootL.position.set(0, -1.09, 0.07)
+  bootL.castShadow = true
+  legL.add(bootL)
   group.add(legL)
 
   const legR = new THREE.Group()
   legR.name = 'legR'
-  legR.position.set(0.16, 0.7, 0)
-  legR.add(buildLimb(0x1c2542, 0.13, 0.7))
+  legR.position.set(0.17, TORSO_BASE_Y, 0)
+  attachSegment(legR, GEO.thigh, MATERIALS.skin, 0, 0.26, 0.13)
+  attachSegment(legR, GEO.shin, mats.socks, -0.52, 0.3, 0.1)
+  const bootR = new THREE.Mesh(GEO.boot, MATERIALS.boot)
+  bootR.position.set(0, -1.09, 0.07)
+  bootR.castShadow = true
+  legR.add(bootR)
   group.add(legR)
 
   const armL = new THREE.Group()
   armL.name = 'armL'
-  armL.position.set(-0.48, 0.55, 0)
-  armL.add(buildLimb(color, 0.1, 0.5))
+  armL.position.set(-0.45, 0.35, 0)
+  attachSegment(armL, GEO.sleeve, mats.jersey, 0, 0.14, 0.105)
+  attachSegment(armL, GEO.forearm, MATERIALS.skin, -0.35, 0.28, 0.085)
   torso.add(armL)
 
   const armR = new THREE.Group()
   armR.name = 'armR'
-  armR.position.set(0.48, 0.55, 0)
-  armR.add(buildLimb(color, 0.1, 0.5))
+  armR.position.set(0.45, 0.35, 0)
+  attachSegment(armR, GEO.sleeve, mats.jersey, 0, 0.14, 0.105)
+  attachSegment(armR, GEO.forearm, MATERIALS.skin, -0.35, 0.28, 0.085)
   torso.add(armR)
 
   const ringGeo = new THREE.RingGeometry(0.55, 0.72, 20)
@@ -329,6 +443,16 @@ export class MatchRenderer3D {
     return mesh
   }
 
+  /** Trigger a brief one-shot pose for a player (see the animation notes at
+   * the top of this file). Safe to call every frame the event is detected —
+   * a fresh call just restarts the timer. */
+  playAction(playerId: string, action: PlayerAction) {
+    const mesh = this.playerMeshes.get(playerId)
+    if (!mesh) return
+    const duration = action === 'celebrate' ? 1.1 : action === 'save' ? 0.45 : 0.3
+    mesh.userData.action = { type: action, startedAt: performance.now() / 1000, duration } satisfies ActiveAction
+  }
+
   render(state: MatchState) {
     const activeIds = new Set<string>()
     const now = performance.now() / 1000
@@ -357,6 +481,18 @@ export class MatchRenderer3D {
       parts.legR.rotation.x = Math.sin(runCycle + Math.PI) * 0.9 * intensity
       parts.armL.rotation.x = Math.sin(runCycle + Math.PI) * 0.55 * intensity
       parts.armR.rotation.x = Math.sin(runCycle) * 0.55 * intensity
+      parts.armL.rotation.z = 0
+      parts.armR.rotation.z = 0
+
+      const active = mesh.userData.action as ActiveAction | undefined
+      if (active) {
+        const t = (now - active.startedAt) / active.duration
+        if (t >= 1) {
+          mesh.userData.action = undefined
+        } else {
+          applyActionPose(parts, active.type, t)
+        }
+      }
 
       const ring = parts.ring
       if (ring) (ring.material as THREE.MeshBasicMaterial).opacity = p.id === state.userControlledId ? 0.85 : 0

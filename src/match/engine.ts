@@ -10,10 +10,39 @@ function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v))
 }
 
+// --- Movement tuning -------------------------------------------------------
+// Real footballers cruise around 3-6 m/s and hit ~8-9 m/s in short sprints;
+// pitch units here are roughly metres. Speeds and pass/shot power were all
+// tuned together (not just one knob) so the whole match slows to a football
+// pace rather than an arcade one, while acceleration stays snappy enough
+// that the controls still feel responsive on a touchscreen.
+const BASE_ACCEL = 34 // units/s^2 reaching a jog
+const BRAKE_ACCEL = 52 // stopping/redirecting is quicker than getting going
+const DIVE_ACCEL = 60 // goalkeepers explode off their line for a save
+
 function maxSpeed(p: MatchPlayer, sprint: boolean) {
-  const staminaFactor = 0.6 + 0.4 * (p.stamina / 100)
-  const base = 16 + (p.pace / 100) * 14
+  const staminaFactor = 0.65 + 0.35 * (p.stamina / 100)
+  const base = 9 + (p.pace / 100) * 6
   return base * staminaFactor * (sprint ? 1.25 : 1)
+}
+
+/** Accelerate p's velocity toward (desiredVx, desiredVy) instead of snapping
+ * to it instantly — this is what gives movement weight/momentum instead of
+ * the twitchy, direction-on-a-dime feel of setting velocity directly. */
+function steerTo(p: MatchPlayer, desiredVx: number, desiredVy: number, dt: number, accel: number) {
+  const dvx = desiredVx - p.vx
+  const dvy = desiredVy - p.vy
+  const dv = Math.hypot(dvx, dvy)
+  const maxDelta = accel * dt
+  if (dv <= maxDelta || dv < 1e-4) {
+    p.vx = desiredVx
+    p.vy = desiredVy
+  } else {
+    p.vx += (dvx / dv) * maxDelta
+    p.vy += (dvy / dv) * maxDelta
+  }
+  p.x = clamp(p.x + p.vx * dt, 1, PITCH.width - 1)
+  p.y = clamp(p.y + p.vy * dt, 1, PITCH.length - 1)
 }
 
 function opponentGoalY(team: Team) {
@@ -49,7 +78,10 @@ function bestPassTarget(state: MatchState, passer: MatchPlayer): MatchPlayer | n
     if (d < 4 || d > 75) continue
     const forwardness = passer.team === 'home' ? t.y - passer.y : passer.y - t.y
     const openness = nearestOpponentDist(state, t)
-    const score = forwardness * 0.55 + openness * 1.3 - d * 0.12
+    // Forward progress matters more than pure openness — otherwise the AI
+    // happily circulates the ball sideways/backwards to whoever is most
+    // unmarked forever and an attack never actually develops.
+    const score = forwardness * 0.95 + openness * 0.75 - d * 0.12
     if (score > bestScore) {
       bestScore = score
       best = t
@@ -64,28 +96,29 @@ function setBallVelocityTo(ball: Ball, fromX: number, fromY: number, toX: number
   const len = Math.hypot(dx, dy) || 1
   ball.vx = (dx / len) * speed
   ball.vy = (dy / len) * speed
-}
-
-function doPass(state: MatchState, passer: MatchPlayer) {
-  const target = bestPassTarget(state, passer)
-  const aim = target ?? { x: opponentGoalX(), y: opponentGoalY(passer.team) * 0.6 + passer.y * 0.4 }
-  const inaccuracy = (1 - passer.passing / 100) * 6
-  const jitterX = (Math.random() - 0.5) * inaccuracy
-  const jitterY = (Math.random() - 0.5) * inaccuracy
-  setBallVelocityTo(state.ball, passer.x, passer.y, aim.x + jitterX, aim.y + jitterY, 62 + passer.passing * 0.35)
-  state.ball.ownerId = null
-  state.ball.lastTouchTeam = passer.team
+  ball.shotResolved = false
 }
 
 function opponentGoalX() {
   return PITCH.width / 2
 }
 
+function doPass(state: MatchState, passer: MatchPlayer) {
+  const target = bestPassTarget(state, passer)
+  const aim = target ?? { x: opponentGoalX(), y: opponentGoalY(passer.team) * 0.6 + passer.y * 0.4 }
+  const inaccuracy = (1 - passer.passing / 100) * 4.5
+  const jitterX = (Math.random() - 0.5) * inaccuracy
+  const jitterY = (Math.random() - 0.5) * inaccuracy
+  setBallVelocityTo(state.ball, passer.x, passer.y, aim.x + jitterX, aim.y + jitterY, 32 + passer.passing * 0.22)
+  state.ball.ownerId = null
+  state.ball.lastTouchTeam = passer.team
+}
+
 function doShoot(state: MatchState, shooter: MatchPlayer) {
   const goalY = opponentGoalY(shooter.team)
-  const spread = (1 - shooter.shooting / 100) * 14
+  const spread = (1 - shooter.shooting / 100) * 11
   const targetX = PITCH.width / 2 + (Math.random() - 0.5) * spread
-  const power = 68 + shooter.shooting * 0.5
+  const power = 34 + shooter.shooting * 0.3
   setBallVelocityTo(state.ball, shooter.x, shooter.y, targetX, goalY, power)
   state.ball.ownerId = null
   state.ball.lastTouchTeam = shooter.team
@@ -139,67 +172,188 @@ function resolveOutOfPlay(state: MatchState) {
   }
 }
 
-function attemptFoul(state: MatchState, tackler: MatchPlayer, carrier: MatchPlayer) {
-  const successProb = clamp(0.5 + (tackler.defending - carrier.dribbling) / 180, 0.12, 0.82)
+// --- Tackling & fouls --------------------------------------------------
+// A challenge is only ever rolled when a defender actually commits to one
+// (see the call sites below) — simply running or standing near an opponent
+// never reaches this function. What happens once a challenge IS attempted
+// depends on how it was made, not a flat dice roll:
+//  - closing speed: a shoulder-to-shoulder jog alongside the ball carrier is
+//    almost never a foul; a full-speed, mistimed lunge often is.
+//  - distance to the ball: winning the ball cleanly rarely draws a whistle;
+//    a challenge made well away from the ball reads as playing the man.
+//  - approach from behind: the classic reckless-tackle case, penalised harder.
+function attemptTackle(state: MatchState, tackler: MatchPlayer, carrier: MatchPlayer) {
+  const relVx = tackler.vx - carrier.vx
+  const relVy = tackler.vy - carrier.vy
+  const closingSpeed = Math.hypot(relVx, relVy)
+
+  const ballDist = dist(tackler.x, tackler.y, state.ball.x, state.ball.y)
+
+  const carrierSpeed = Math.hypot(carrier.vx, carrier.vy)
+  let fromBehind = false
+  if (carrierSpeed > 0.8) {
+    const toTacklerX = tackler.x - carrier.x
+    const toTacklerY = tackler.y - carrier.y
+    const toTacklerLen = Math.hypot(toTacklerX, toTacklerY) || 1
+    // Dot of "carrier's forward direction" with "direction toward tackler":
+    // strongly negative means the tackler is coming from behind the runner.
+    const facing = (toTacklerX * carrier.vx + toTacklerY * carrier.vy) / (toTacklerLen * carrierSpeed)
+    fromBehind = facing < -0.45
+  }
+
+  const skillFactor = clamp((tackler.defending - carrier.dribbling) / 140, -0.5, 0.5)
+  const successProb = clamp(0.58 + skillFactor - closingSpeed * 0.02, 0.2, 0.88)
+
   if (Math.random() < successProb) {
+    // Clean challenge — ball won fairly, no need to even roll for a foul.
     state.ball.ownerId = tackler.id
     state.ball.vx = 0
     state.ball.vy = 0
+    state.ball.shotResolved = true
     return
   }
 
-  const foulChance = 0.32
-  if (Math.random() < foulChance) {
-    const inBox =
-      (tackler.team === 'home' && carrier.y < PITCH.boxDepth) ||
-      (tackler.team === 'away' && carrier.y > PITCH.length - PITCH.boxDepth)
+  let foulChance = 0.08
+  foulChance += Math.max(0, closingSpeed - 3.2) * 0.05
+  if (ballDist > 3.2) foulChance += 0.14
+  if (fromBehind) foulChance += 0.16
+  foulChance = clamp(foulChance, 0.03, 0.58)
 
-    if (inBox) {
-      startRestart(state, 'penalty', carrier.team, PITCH.width / 2, tackler.team === 'home' ? 12 : PITCH.length - 12, 'Пенальти!')
+  if (Math.random() >= foulChance) {
+    // Failed to win it and it wasn't reckless enough to be a foul — the ball
+    // just breaks away from the challenge instead of stopping play.
+    const kickAngle = Math.random() * Math.PI * 2
+    state.ball.vx += Math.cos(kickAngle) * 3
+    state.ball.vy += Math.sin(kickAngle) * 3
+    state.ball.ownerId = null
+    return
+  }
+
+  const inBox =
+    (tackler.team === 'home' && carrier.y < PITCH.boxDepth) ||
+    (tackler.team === 'away' && carrier.y > PITCH.length - PITCH.boxDepth)
+
+  if (inBox) {
+    startRestart(state, 'penalty', carrier.team, PITCH.width / 2, tackler.team === 'home' ? 12 : PITCH.length - 12, 'Пенальти!')
+  } else {
+    startRestart(state, 'freekick', carrier.team, tackler.x, tackler.y, 'Штрафной удар')
+  }
+
+  // Reckless, from-behind, or high-speed challenges are the ones that earn
+  // cards — a mistimed-but-fair-looking tackle usually just gets a talking-to.
+  let cardChance = 0.1
+  if (fromBehind) cardChance += 0.2
+  if (closingSpeed > 8) cardChance += 0.15
+  if (Math.random() < cardChance) {
+    tackler.yellow += 1
+    state.cards[tackler.team].yellow += 1
+    if (tackler.yellow >= 2) {
+      tackler.sentOff = true
+      state.cards[tackler.team].red += 1
+      pushEvent(state, 'red', tackler.team, `${tackler.name}: вторая жёлтая, удаление!`)
     } else {
-      startRestart(state, 'freekick', carrier.team, tackler.x, tackler.y, 'Штрафной удар')
-    }
-
-    const cardRoll = Math.random()
-    if (cardRoll < 0.22) {
-      tackler.yellow += 1
-      state.cards[tackler.team].yellow += 1
-      if (tackler.yellow >= 2) {
-        tackler.sentOff = true
-        state.cards[tackler.team].red += 1
-        pushEvent(state, 'red', tackler.team, `${tackler.name}: вторая жёлтая, удаление!`)
-      } else {
-        pushEvent(state, 'yellow', tackler.team, `${tackler.name}: жёлтая карточка`)
-      }
+      pushEvent(state, 'yellow', tackler.team, `${tackler.name}: жёлтая карточка`)
     }
   }
 }
 
-function updateGoalkeeper(state: MatchState, gk: MatchPlayer, dt: number) {
+// --- Goalkeepers ---------------------------------------------------------
+// Both teams' keepers run through this exact same function with the exact
+// same formula — there is no separate, easier path for the AI side. Saves
+// are resolved once per shot via a predicted line-crossing point rather than
+// re-rolling every frame the ball happens to be "close", which is what made
+// fast shots feel like a coin flip before (a shot could cross the whole save
+// window between two frames and never get evaluated at a sane distance).
+function goalkeeperDistribute(state: MatchState, gk: MatchPlayer) {
+  const target = bestPassTarget(state, gk)
+  if (target) {
+    setBallVelocityTo(state.ball, gk.x, gk.y, target.x, target.y, 24 + gk.passing * 0.14)
+  } else {
+    // No easy short option — clear it long into space upfield.
+    const aimY = gk.team === 'home' ? PITCH.length * 0.6 : PITCH.length * 0.4
+    const aimX = PITCH.width / 2 + (Math.random() - 0.5) * 40
+    setBallVelocityTo(state.ball, gk.x, gk.y, aimX, aimY, 34)
+  }
+  state.ball.ownerId = null
+  state.ball.lastTouchTeam = gk.team
+}
+
+function updateGoalkeeper(state: MatchState, gk: MatchPlayer, dt: number, now: number) {
   const own = ownGoalY(gk.team)
+  const goalLeft = PITCH.width / 2 - PITCH.goalWidth / 2
+  const goalRight = PITCH.width / 2 + PITCH.goalWidth / 2
   const b = state.ball
-  const targetX = clamp(b.x, PITCH.width / 2 - PITCH.goalWidth / 2 + 1, PITCH.width / 2 + PITCH.goalWidth / 2 - 1)
+
+  const targetX = clamp(b.x, goalLeft + 1, goalRight - 1)
   const distToOwnGoal = Math.abs(b.y - own)
-  const advance = distToOwnGoal < 30 ? clamp((30 - distToOwnGoal) / 30, 0, 1) * 6 : 0
-  const targetY = own + (gk.team === 'home' ? 3 + advance : -3 - advance)
+  const advance = distToOwnGoal < 32 ? clamp((32 - distToOwnGoal) / 32, 0, 1) * 6.5 : 0
+  const targetY = own + (gk.team === 'home' ? 2.5 + advance : -2.5 - advance)
+  const urgent = distToOwnGoal < 22
+  const toTargetX = targetX - gk.x
+  const toTargetY = targetY - gk.y
+  const toTargetD = Math.hypot(toTargetX, toTargetY)
+  const gkSpeed = maxSpeed(gk, urgent)
+  const desiredVx = toTargetD < 0.4 ? 0 : (toTargetX / toTargetD) * gkSpeed
+  const desiredVy = toTargetD < 0.4 ? 0 : (toTargetY / toTargetD) * gkSpeed
+  steerTo(gk, desiredVx, desiredVy, dt, urgent ? DIVE_ACCEL : BASE_ACCEL)
 
-  moveToward(gk, targetX, targetY, dt, false)
+  // A keeper who has the ball must eventually let go of it — without this a
+  // caught shot or a loose ball gathered near the box would stick to them
+  // forever and the match would just stall.
+  if (b.ownerId === gk.id) {
+    if (now >= gk.nextDecisionAt) goalkeeperDistribute(state, gk)
+    return
+  }
 
-  if (!b.ownerId) {
-    const ballSpeed = Math.hypot(b.vx, b.vy)
-    const movingTowardOwnGoal = gk.team === 'home' ? b.vy < -5 : b.vy > 5
-    if (ballSpeed > 20 && movingTowardOwnGoal) {
-      const d = dist(gk.x, gk.y, b.x, b.y)
-      const reach = 7 + gk.physical / 18
-      if (d < reach) {
-        const saveProb = clamp(0.35 + (gk.defending + gk.physical) / 260 - ballSpeed / 400, 0.15, 0.92)
-        if (Math.random() < saveProb) {
-          b.ownerId = gk.id
-          b.vx = 0
-          b.vy = 0
-        }
-      }
-    }
+  if (b.ownerId || b.shotResolved) return
+
+  const headingTowardThisGoal = gk.team === 'home' ? b.vy < 0 : b.vy > 0
+  const ballSpeed = Math.hypot(b.vx, b.vy)
+  if (!headingTowardThisGoal || ballSpeed < 9) return
+
+  const tToLine = b.vy !== 0 ? (own - b.y) / b.vy : Infinity
+  if (tToLine <= 0 || tToLine > 2.4) return
+
+  const predictedX = b.x + b.vx * tToLine
+  const onTarget = predictedX > goalLeft - 1.5 && predictedX < goalRight + 1.5
+  if (!onTarget) {
+    return // heading wide or over — nothing for the keeper to do
+  }
+
+  const distToPredicted = Math.abs(gk.x - predictedX)
+  const diveSpeed = maxSpeed(gk, true) * 1.35
+  const reachMargin = tToLine - distToPredicted / diveSpeed
+
+  b.shotResolved = true
+
+  if (reachMargin < -0.3) {
+    // Physically cannot get across in time — no roll, the ball beats them clean.
+    return
+  }
+
+  const marginFactor = clamp(reachMargin / 0.55, 0, 1)
+  const skill = (gk.defending + gk.physical) / 2
+  const powerPenalty = clamp((ballSpeed - 26) / 55, 0, 0.32)
+  const saveProb = clamp(0.4 + marginFactor * 0.4 + (skill / 100) * 0.3 - powerPenalty, 0.06, 0.93)
+
+  if (Math.random() >= saveProb) {
+    return // beaten — goal
+  }
+
+  if (marginFactor > 0.55 && ballSpeed < 46) {
+    // Comfortable save — caught and held.
+    b.ownerId = gk.id
+    b.vx = 0
+    b.vy = 0
+    gk.nextDecisionAt = now + 0.9 + Math.random() * 0.5
+  } else {
+    // Stretch save / parry: can't hold it, knocked away instead — a loose
+    // ball or scramble rather than a clean take.
+    const deflectAngle = Math.random() * Math.PI * 2
+    b.x = gk.x
+    b.y = gk.y
+    b.vx = Math.cos(deflectAngle) * 6
+    b.vy = Math.sin(deflectAngle) * 6 + (gk.team === 'home' ? 3 : -3)
   }
 }
 
@@ -208,17 +362,11 @@ function moveToward(p: MatchPlayer, tx: number, ty: number, dt: number, sprint: 
   const dy = ty - p.y
   const d = Math.hypot(dx, dy)
   if (d < 0.4) {
-    p.vx *= 0.8
-    p.vy *= 0.8
+    steerTo(p, 0, 0, dt, BRAKE_ACCEL)
     return
   }
   const speed = maxSpeed(p, sprint)
-  p.vx = (dx / d) * speed
-  p.vy = (dy / d) * speed
-  p.x += p.vx * dt
-  p.y += p.vy * dt
-  p.x = clamp(p.x, 1, PITCH.width - 1)
-  p.y = clamp(p.y, 1, PITCH.length - 1)
+  steerTo(p, (dx / d) * speed, (dy / d) * speed, dt, BASE_ACCEL)
 }
 
 function updateAiOutfield(state: MatchState, p: MatchPlayer, dt: number, now: number) {
@@ -228,10 +376,15 @@ function updateAiOutfield(state: MatchState, p: MatchPlayer, dt: number, now: nu
 
   if (hasBall) {
     if (now >= p.nextDecisionAt) {
-      p.nextDecisionAt = now + 0.45 + Math.random() * 0.3
+      p.nextDecisionAt = now + 0.35 + Math.random() * 0.25
       const goalDist = dist(p.x, p.y, opponentGoalX(), opponentGoalY(p.team))
       const pressure = nearestOpponentDist(state, p)
-      if (goalDist < 42 && pressure > 6 && Math.random() < 0.5 + p.shooting / 250) {
+      // A clear-cut chance close to goal gets taken almost regardless of
+      // pressure — a striker one-on-one doesn't pass it off. Further out,
+      // only shoot with room to actually strike it properly.
+      const closeRangeChance = goalDist < 22 && pressure > 1.8 && Math.random() < 0.72 + p.shooting / 400
+      const longRangeChance = goalDist < 48 && pressure > 4.5 && Math.random() < 0.5 + p.shooting / 250
+      if (closeRangeChance || longRangeChance) {
         doShoot(state, p)
         return
       }
@@ -266,12 +419,31 @@ function updateAiOutfield(state: MatchState, p: MatchPlayer, dt: number, now: nu
       .filter((x) => x.team === p.team && !x.isGK && !x.sentOff)
       .every((x) => x.id === p.id || dist(x.x, x.y, carrier.x, carrier.y) >= dToCarrier)
 
-    if (isClosestDefender && dToCarrier < 34) {
+    if (isClosestDefender && dToCarrier < 30) {
       moveToward(p, carrier.x, carrier.y, dt, true)
-      if (dToCarrier < 2.2 && now >= p.nextDecisionAt) {
-        p.nextDecisionAt = now + 0.7
-        attemptFoul(state, p, carrier)
+      // Jockey at close range rather than diving into a challenge every
+      // single cooldown tick — most of the time a marking defender just
+      // stays goal-side and waits for a better moment.
+      if (dToCarrier < 1.8 && now >= p.nextDecisionAt) {
+        p.nextDecisionAt = now + 1.1 + Math.random() * 0.4
+        if (Math.random() < 0.5) attemptTackle(state, p, carrier)
       }
+      return
+    }
+  }
+
+  // Nobody owns the ball right now (mid-pass reception, a blocked shot, a
+  // tackle that broke it loose, a rebound off the keeper...). Without this,
+  // every player just drifted back to their formation slot and left the
+  // ball to sit wherever it ran out of momentum — the closest player on
+  // each side should actually contest a loose ball instead.
+  if (!b.ownerId) {
+    const dToBall = dist(p.x, p.y, b.x, b.y)
+    const isNearestTeammate = state.players
+      .filter((x) => x.team === p.team && !x.isGK && !x.sentOff)
+      .every((x) => x.id === p.id || dist(x.x, x.y, b.x, b.y) >= dToBall)
+    if (isNearestTeammate && dToBall < 50) {
+      moveToward(p, b.x, b.y, dt, true)
       return
     }
   }
@@ -292,7 +464,7 @@ export function stepMatch(state: MatchState, dt: number, input: MatchInput, now:
   if (state.phase !== 'play') {
     state.phaseTimer -= dt
     if (state.phaseTimer <= 0 && state.phase !== 'penalty') {
-      resumePlayFromRestart(state)
+      resumePlayFromRestart(state, now)
     }
     const phaseNow = state.phase as MatchState['phase']
     if (phaseNow !== 'play') return state
@@ -317,7 +489,7 @@ export function stepMatch(state: MatchState, dt: number, input: MatchInput, now:
   for (const p of state.players) {
     if (p.sentOff) continue
     if (p.isGK) {
-      updateGoalkeeper(state, p, dt)
+      updateGoalkeeper(state, p, dt, now)
       continue
     }
     if (p.id === controlled.id) {
@@ -327,16 +499,10 @@ export function stepMatch(state: MatchState, dt: number, input: MatchInput, now:
         // The match camera is a fixed sideline camera (see render3d.ts): on
         // screen, pitch-length (sim y) reads as left/right and pitch-width
         // (sim x) reads as near/far. So joystick "right" (moveX) must drive
-        // sim y, and joystick "up" (moveY) must drive sim x — mapping the
-        // stick straight to sim x/y (as before) made sideways input look
-        // like forward/backward motion instead.
-        p.vx = (-input.moveY / len) * speed
-        p.vy = (-input.moveX / len) * speed
-        p.x = clamp(p.x + p.vx * dt, 1, PITCH.width - 1)
-        p.y = clamp(p.y + p.vy * dt, 1, PITCH.length - 1)
+        // sim y, and joystick "up" (moveY) must drive sim x.
+        steerTo(p, (-input.moveY / len) * speed, (-input.moveX / len) * speed, dt, BASE_ACCEL)
       } else {
-        p.vx *= 0.85
-        p.vy *= 0.85
+        steerTo(p, 0, 0, dt, BRAKE_ACCEL)
       }
 
       if (state.ball.ownerId === p.id) {
@@ -345,8 +511,8 @@ export function stepMatch(state: MatchState, dt: number, input: MatchInput, now:
       } else if (input.shoot) {
         const carrier = state.ball.ownerId ? state.players.find((x) => x.id === state.ball.ownerId) : null
         if (carrier && carrier.team !== p.team && dist(p.x, p.y, carrier.x, carrier.y) < 3 && now >= state.tackleCooldownUntil) {
-          state.tackleCooldownUntil = now + 0.5
-          attemptFoul(state, p, carrier)
+          state.tackleCooldownUntil = now + 0.6
+          attemptTackle(state, p, carrier)
         }
       }
       continue
@@ -361,16 +527,16 @@ export function stepMatch(state: MatchState, dt: number, input: MatchInput, now:
       const len = Math.hypot(owner.vx, owner.vy) || 1
       const aheadX = owner.vx / len
       const aheadY = owner.vy / len
-      b.x = owner.x + aheadX * 1.6
-      b.y = owner.y + aheadY * 1.6
+      b.x = owner.x + aheadX * 1.4
+      b.y = owner.y + aheadY * 1.4
       b.vx = 0
       b.vy = 0
     } else {
       b.ownerId = null
     }
   } else {
-    b.vx *= 1 - Math.min(1, 1.1 * dt)
-    b.vy *= 1 - Math.min(1, 1.1 * dt)
+    b.vx *= 1 - Math.min(1, 0.85 * dt)
+    b.vy *= 1 - Math.min(1, 0.85 * dt)
     b.x += b.vx * dt
     b.y += b.vy * dt
 
@@ -393,17 +559,16 @@ export function stepMatch(state: MatchState, dt: number, input: MatchInput, now:
         nearest = p
       }
     }
-    if (nearest && nearestD < 2.6) {
+    if (nearest && nearestD < 2.4) {
       b.ownerId = nearest.id
       b.lastTouchTeam = nearest.team
-      if (nearest.team === 'home' && !nearest.isGK) {
+      b.shotResolved = true
+      if (nearest.isGK) {
+        nearest.nextDecisionAt = now + 0.7 + Math.random() * 0.4
+      } else if (nearest.team === 'home') {
         state.userControlledId = nearest.id
       }
     }
-  }
-
-  if (!b.ownerId && b.vx === 0 && b.vy === 0) {
-    // stationary loose ball, handled by pickup above next tick
   }
 
   if (!b.ownerId) {
@@ -426,7 +591,7 @@ export function stepMatch(state: MatchState, dt: number, input: MatchInput, now:
   return state
 }
 
-function resumePlayFromRestart(state: MatchState) {
+function resumePlayFromRestart(state: MatchState, now: number) {
   const spot = state.restartSpot
   const team = state.restartTeam
   if (spot && team) {
@@ -444,7 +609,12 @@ function resumePlayFromRestart(state: MatchState) {
       closest.x = spot.x
       closest.y = spot.y
       state.ball.ownerId = closest.id
-      if (closest.team === 'home' && !closest.isGK) state.userControlledId = closest.id
+      state.ball.shotResolved = true
+      if (closest.isGK) {
+        closest.nextDecisionAt = now + 0.4 + Math.random() * 0.3
+      } else if (closest.team === 'home') {
+        state.userControlledId = closest.id
+      }
     }
   }
   state.phase = 'play'
@@ -486,6 +656,7 @@ function resetForKickoff(state: MatchState) {
   state.ball.y = PITCH.length / 2
   state.ball.vx = 0
   state.ball.vy = 0
+  state.ball.shotResolved = true
   const starter = state.players.find((p) => p.team === kickoffTeam && !p.isGK)
   if (starter) {
     state.ball.ownerId = starter.id
