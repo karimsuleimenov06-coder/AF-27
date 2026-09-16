@@ -37,6 +37,13 @@ export const RARITY_STYLE: Record<Rarity, RarityStyle> = {
     text: 'text-white',
     chipBg: 'bg-violet/20 text-cyan border-cyan/40',
   },
+  icon: {
+    gradient: 'from-night-2 via-gold-2 to-night-2',
+    ring: 'ring-gold-2/80',
+    glow: 'shadow-gold/60',
+    text: 'text-white',
+    chipBg: 'bg-night text-gold-2 border-gold-2/60',
+  },
 }
 
 export const POSITION_GROUP_ACCENT: Record<PositionGroup, string> = {

@@ -17,7 +17,7 @@ export type Position =
 
 export type PositionGroup = 'GK' | 'DEF' | 'MID' | 'ATT'
 
-export type Rarity = 'bronze' | 'silver' | 'gold' | 'special'
+export type Rarity = 'bronze' | 'silver' | 'gold' | 'special' | 'icon'
 
 export type Foot = 'left' | 'right'
 
@@ -90,6 +90,7 @@ export const RARITY_LABEL: Record<Rarity, string> = {
   silver: 'Серебро',
   gold: 'Золото',
   special: 'Astra',
+  icon: 'Icon',
 }
 
 const OVERALL_WEIGHTS: Record<PositionGroup, PlayerStats> = {

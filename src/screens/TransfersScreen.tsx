@@ -10,7 +10,8 @@ import PlayerRow from '../components/PlayerRow'
 import { CoinIcon } from '../components/Icons'
 
 const MARKET_SIZE = 8
-const MARKET_ODDS: Record<Rarity, number> = { bronze: 0.22, silver: 0.4, gold: 0.3, special: 0.08 }
+// Icons are pack-exclusive — the transfer market never rolls or lists them.
+const MARKET_ODDS: Record<Rarity, number> = { bronze: 0.22, silver: 0.4, gold: 0.3, special: 0.08, icon: 0 }
 
 function rollMarketRarity(): Rarity {
   const roll = Math.random()

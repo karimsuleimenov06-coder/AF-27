@@ -1,8 +1,9 @@
 import type { PackTier } from '../data/packs'
 import { generatePlayer, rollRarity } from './playerGenerator'
+import { pickRandomIcon } from '../data/icons'
 import type { Player, Rarity } from '../types/player'
 
-const RARITY_RANK: Record<Rarity, number> = { bronze: 0, silver: 1, gold: 2, special: 3 }
+const RARITY_RANK: Record<Rarity, number> = { bronze: 0, silver: 1, gold: 2, special: 3, icon: 4 }
 
 export function openPack(pack: PackTier): Player[] {
   const rarities: Rarity[] = []
@@ -29,5 +30,5 @@ export function openPack(pack: PackTier): Player[] {
   }
 
   rarities.sort((a, b) => RARITY_RANK[a] - RARITY_RANK[b])
-  return rarities.map((r) => generatePlayer(r))
+  return rarities.map((r) => (r === 'icon' ? pickRandomIcon() : generatePlayer(r)))
 }

@@ -6,6 +6,10 @@ const RATING_BAND: Record<Rarity, [number, number]> = {
   silver: [65, 74],
   gold: [75, 84],
   special: [85, 93],
+  // Icons are never procedurally generated (see data/icons.ts) — this band
+  // only exists so the Record stays exhaustive; generatePlayer('icon', ...)
+  // should never actually be called.
+  icon: [94, 94],
 }
 
 const WEIGHTED_POSITIONS: Position[] = [
@@ -62,7 +66,7 @@ export function generatePlayer(rarity: Rarity, forcePosition?: Position): Player
 export function rollRarity(odds: Record<Rarity, number>): Rarity {
   const roll = Math.random()
   let acc = 0
-  const order: Rarity[] = ['special', 'gold', 'silver', 'bronze']
+  const order: Rarity[] = ['icon', 'special', 'gold', 'silver', 'bronze']
   for (const r of order) {
     acc += odds[r]
     if (roll <= acc) return r

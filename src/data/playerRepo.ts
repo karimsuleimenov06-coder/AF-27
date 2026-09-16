@@ -23,7 +23,9 @@ export function applyBoosts(player: Player, boosts: StatBoosts | undefined): Pla
     ...player,
     stats,
     rating,
-    rarity: getRarity(rating),
+    // Icons are a fixed, hand-placed tier, not derived from rating bands —
+    // training one further must never demote it back to a regular rarity.
+    rarity: player.rarity === 'icon' ? 'icon' : getRarity(rating),
     value: calculateValue(rating),
   }
 }
