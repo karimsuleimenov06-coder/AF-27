@@ -1,10 +1,15 @@
 import { calculateOverall, calculateValue, getRarity, type Player } from '../types/player'
-import { CLUB_PLAYERS } from './players'
+import { ALL_PLAYERS, STARTING_ROSTER_IDS } from './players'
 import { useCollectionStore } from '../state/collectionStore'
 import { useUpgradesStore, type StatBoosts } from '../state/upgradesStore'
 
+/** The starting-roster subset of the AF27 100-player database — owned for
+ * free so a match is always playable. Every other AF27 player only enters a
+ * collection via a pack pull or a transfer-market purchase. */
+const STARTING_PLAYERS: Player[] = STARTING_ROSTER_IDS.map((id) => ALL_PLAYERS.find((p) => p.id === id)!).filter(Boolean)
+
 export function getAllBasePlayers(): Player[] {
-  return [...CLUB_PLAYERS, ...useCollectionStore.getState().extraPlayers]
+  return [...STARTING_PLAYERS, ...useCollectionStore.getState().extraPlayers]
 }
 
 export function getBasePlayerById(id: string): Player | undefined {
@@ -19,15 +24,18 @@ export function applyBoosts(player: Player, boosts: StatBoosts | undefined): Pla
     stats[key] = Math.min(99, stats[key] + add)
   }
   const rating = calculateOverall(player.position, stats)
+  // Promo cards are a fixed, hand-placed tier, not derived from rating
+  // bands — training one further must never demote it back to a regular
+  // rarity. Every other rarity (common/rare/epic/legendary) is purely
+  // OVR-band-derived, so it's expected — and fine — for a heavily trained
+  // player to climb into a higher rarity tier.
+  const rarity = player.rarity === 'promo' ? 'promo' : getRarity(rating)
   return {
     ...player,
     stats,
     rating,
-    // Icons and promo cards are fixed, hand-placed tiers, not derived from
-    // rating bands — training one further must never demote it back to a
-    // regular rarity.
-    rarity: player.rarity === 'icon' || player.rarity === 'promo' ? player.rarity : getRarity(rating),
-    value: calculateValue(rating),
+    rarity,
+    value: calculateValue(rating, rarity),
   }
 }
 
@@ -46,7 +54,7 @@ export function getAllEffectivePlayers(): Player[] {
 export function useAllPlayers(): Player[] {
   const extraPlayers = useCollectionStore((s) => s.extraPlayers)
   const boosts = useUpgradesStore((s) => s.boosts)
-  const base = [...CLUB_PLAYERS, ...extraPlayers]
+  const base = [...STARTING_PLAYERS, ...extraPlayers]
   return base.map((p) => applyBoosts(p, boosts[p.id]))
 }
 
@@ -54,7 +62,7 @@ export function useEffectivePlayer(id: string | null): Player | null {
   const extraPlayers = useCollectionStore((s) => s.extraPlayers)
   const boosts = useUpgradesStore((s) => s.boosts)
   if (!id) return null
-  const base = CLUB_PLAYERS.find((p) => p.id === id) ?? extraPlayers.find((p) => p.id === id)
+  const base = STARTING_PLAYERS.find((p) => p.id === id) ?? extraPlayers.find((p) => p.id === id)
   if (!base) return null
   return applyBoosts(base, boosts[id])
 }

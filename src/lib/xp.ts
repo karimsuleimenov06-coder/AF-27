@@ -18,19 +18,18 @@ export function xpNeededForLevel(rating: number): number {
 }
 
 const RARITY_DONOR_BONUS: Record<Rarity, number> = {
-  bronze: 0,
-  silver: 60,
-  gold: 160,
-  special: 420,
-  icon: 2000,
-  promo: 1500,
+  common: 0,
+  rare: 70,
+  epic: 220,
+  legendary: 650,
+  promo: 500,
 }
 
 /** How much XP feeding `donor` into another player's progress is worth.
- * Scales with the donor's own rating and rarity — sacrificing a gold or
- * Icon card is a real sacrifice, so it pays off proportionally. */
+ * Scales with the donor's OVR, rarity, and market value — sacrificing an
+ * Epic or Legendary card is a real sacrifice, so it pays off proportionally. */
 export function xpFromDonor(donor: Player): number {
-  return Math.round(donor.rating * 8 + RARITY_DONOR_BONUS[donor.rarity])
+  return Math.round(donor.rating * 8 + RARITY_DONOR_BONUS[donor.rarity] + donor.value * 0.02)
 }
 
 function mergedStats(base: PlayerStats, boosts: StatBoosts): PlayerStats {

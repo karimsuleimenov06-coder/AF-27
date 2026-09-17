@@ -1,8 +1,6 @@
 import { useState } from 'react'
 import { PACKS, type PackTier } from '../data/packs'
 import { openPack } from '../lib/openPack'
-import { sellValue } from '../lib/economy'
-import { getAllBasePlayers } from '../data/playerRepo'
 import { useAppStore } from '../state/appStore'
 import { useCollectionStore } from '../state/collectionStore'
 import { RARITY_STYLE } from '../lib/cardStyles'
@@ -12,8 +10,6 @@ import { CoinIcon, GemIcon, PackIcon } from '../components/Icons'
 
 interface PulledCard {
   player: Player
-  duplicate: boolean
-  coinsAwarded: number
 }
 
 type Stage = 'browse' | 'opening' | 'reveal'
@@ -47,7 +43,6 @@ export default function PacksScreen() {
   const profile = useAppStore((s) => s.profile)
   const spendCoins = useAppStore((s) => s.spendCoins)
   const spendGems = useAppStore((s) => s.spendGems)
-  const addCoins = useAppStore((s) => s.addCoins)
   const addPlayer = useCollectionStore((s) => s.addPlayer)
 
   const [stage, setStage] = useState<Stage>('browse')
@@ -68,23 +63,17 @@ export default function PacksScreen() {
 
     setTimeout(() => {
       const pulled = openPack(pack)
-      const knownNames = new Set(getAllBasePlayers().map((p) => p.name))
-      const result: PulledCard[] = pulled.map((player) => {
-        const duplicate = knownNames.has(player.name)
-        knownNames.add(player.name)
-        return { player, duplicate, coinsAwarded: duplicate ? sellValue(player.value) : 0 }
-      })
-      setCards(result)
+      setCards(pulled.map((player) => ({ player })))
       setRevealIndex(0)
       setStage('reveal')
     }, 900)
   }
 
   const finishReveal = () => {
-    for (const card of cards) {
-      if (card.duplicate) addCoins(card.coinsAwarded)
-      else addPlayer(card.player)
-    }
+    // Every pull joins the collection as its own card, even a second copy
+    // of a player you already own — extra copies are the raw material for
+    // the XP/sacrifice system (Улучшение), not something to auto-sell.
+    for (const card of cards) addPlayer(card.player)
     setStage('browse')
     setActivePack(null)
     setCards([])
@@ -118,15 +107,9 @@ export default function PacksScreen() {
           <PlayerCard player={current.player} size="lg" />
         </div>
 
-        {current.duplicate ? (
-          <div className={`flex items-center gap-2 rounded-full border px-4 py-1.5 ${rarityStyle.chipBg}`}>
-            <span className="font-display text-sm font-bold">Дубликат · +{current.coinsAwarded} монет</span>
-          </div>
-        ) : (
-          <div className={`flex items-center gap-2 rounded-full border px-4 py-1.5 ${rarityStyle.chipBg}`}>
-            <span className="font-display text-sm font-bold">Новый игрок · {RARITY_LABEL[current.player.rarity]}</span>
-          </div>
-        )}
+        <div className={`flex items-center gap-2 rounded-full border px-4 py-1.5 ${rarityStyle.chipBg}`}>
+          <span className="font-display text-sm font-bold">{current.player.name} · {RARITY_LABEL[current.player.rarity]}</span>
+        </div>
 
         <button
           onClick={() => (isLast ? finishReveal() : setRevealIndex((i) => i + 1))}

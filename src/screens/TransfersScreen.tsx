@@ -1,30 +1,22 @@
 import { useMemo, useState } from 'react'
-import { generatePlayer } from '../lib/playerGenerator'
+import { ALL_PLAYERS } from '../data/players'
+import { pickWeightedPlayer, instantiatePlayer } from '../lib/playerPool'
 import { marketPrice, sellValue } from '../lib/economy'
 import { useAppStore } from '../state/appStore'
 import { useCollectionStore } from '../state/collectionStore'
 import { useSquadStore } from '../state/squadStore'
 import { useAllPlayers } from '../data/playerRepo'
-import type { Player, Rarity } from '../types/player'
+import type { Player } from '../types/player'
 import PlayerRow from '../components/PlayerRow'
 import { CoinIcon } from '../components/Icons'
 
 const MARKET_SIZE = 8
-// Icons and promo cards never roll or list on the transfer market.
-const MARKET_ODDS: Record<Rarity, number> = { bronze: 0.22, silver: 0.4, gold: 0.3, special: 0.08, icon: 0, promo: 0 }
-
-function rollMarketRarity(): Rarity {
-  const roll = Math.random()
-  let acc = 0
-  for (const r of ['bronze', 'silver', 'gold', 'special'] as Rarity[]) {
-    acc += MARKET_ODDS[r]
-    if (roll <= acc) return r
-  }
-  return 'bronze'
-}
+// The 4 Legendary (94 OVR) players stay pack-exclusive — everything else in
+// the AF27 100-player database can appear on the transfer market.
+const MARKET_POOL = ALL_PLAYERS.filter((p) => p.rarity !== 'legendary')
 
 function generateMarket(size: number): Player[] {
-  return Array.from({ length: size }, () => generatePlayer(rollMarketRarity()))
+  return Array.from({ length: size }, () => instantiatePlayer(pickWeightedPlayer(MARKET_POOL)))
 }
 
 export default function TransfersScreen() {
@@ -50,7 +42,7 @@ export default function TransfersScreen() {
   const buyPlayer = (player: Player) => {
     if (!spendCoins(marketPrice(player.value))) return
     addPlayer(player)
-    setMarket((m) => m.map((p) => (p.id === player.id ? generatePlayer(rollMarketRarity()) : p)))
+    setMarket((m) => m.map((p) => (p.id === player.id ? instantiatePlayer(pickWeightedPlayer(MARKET_POOL)) : p)))
   }
 
   const sellPlayer = (player: Player) => {

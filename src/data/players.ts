@@ -1,328 +1,253 @@
 import { createPlayer, type Player } from '../types/player'
 
-export const CLUB_PLAYERS: Player[] = [
-  createPlayer({
-    id: 'p01',
-    name: 'Марко Винтнер',
-    position: 'GK',
-    foot: 'right',
-    stamina: 75,
-    stats: { pace: 28, shooting: 12, passing: 58, dribbling: 30, defending: 88, physical: 82 },
-  }),
-  createPlayer({
-    id: 'p02',
-    name: 'Элиан Ковач',
-    position: 'GK',
-    foot: 'right',
-    stamina: 65,
-    stats: { pace: 18, shooting: 8, passing: 38, dribbling: 18, defending: 70, physical: 68 },
-  }),
-  createPlayer({
-    id: 'p03',
-    name: 'Дарио Фенн',
-    position: 'GK',
-    foot: 'left',
-    stamina: 68,
-    stats: { pace: 22, shooting: 9, passing: 42, dribbling: 22, defending: 75, physical: 72 },
-  }),
-  createPlayer({
-    id: 'p04',
-    name: 'Николай Астров',
-    position: 'CB',
-    foot: 'right',
-    stamina: 85,
-    stats: { pace: 80, shooting: 30, passing: 80, dribbling: 68, defending: 99, physical: 93 },
-  }),
-  createPlayer({
-    id: 'p05',
-    name: 'Рюрик Хальворсен',
-    position: 'CB',
-    foot: 'left',
-    stamina: 76,
-    stats: { pace: 72, shooting: 18, passing: 65, dribbling: 50, defending: 90, physical: 85 },
-  }),
-  createPlayer({
-    id: 'p06',
-    name: 'Тео Бассонг',
-    position: 'CB',
-    foot: 'right',
-    stamina: 72,
-    stats: { pace: 65, shooting: 15, passing: 55, dribbling: 45, defending: 75, physical: 78 },
-  }),
-  createPlayer({
-    id: 'p07',
-    name: 'Икер Салазар',
-    position: 'CB',
-    foot: 'right',
-    stamina: 66,
-    stats: { pace: 60, shooting: 12, passing: 48, dribbling: 40, defending: 65, physical: 68 },
-  }),
-  createPlayer({
-    id: 'p08',
-    name: 'Брам Оостинг',
-    position: 'LB',
-    foot: 'left',
-    stamina: 80,
-    stats: { pace: 78, shooting: 20, passing: 60, dribbling: 58, defending: 68, physical: 66 },
-  }),
-  createPlayer({
-    id: 'p09',
-    name: 'Юсуф Демирел',
-    position: 'LB',
-    foot: 'left',
-    stamina: 74,
-    stats: { pace: 70, shooting: 15, passing: 50, dribbling: 48, defending: 60, physical: 60 },
-  }),
-  createPlayer({
-    id: 'p10',
-    name: 'Оуэн Фитцджеральд',
-    position: 'RB',
-    foot: 'right',
-    stamina: 82,
-    stats: { pace: 88, shooting: 22, passing: 66, dribbling: 60, defending: 84, physical: 76 },
-  }),
-  createPlayer({
-    id: 'p11',
-    name: 'Кенджи Аракава',
-    position: 'RB',
-    foot: 'right',
-    stamina: 78,
-    stats: { pace: 80, shooting: 18, passing: 56, dribbling: 54, defending: 66, physical: 64 },
-  }),
-  createPlayer({
-    id: 'p12',
-    name: 'Сами Аль-Файед',
-    position: 'CDM',
-    foot: 'right',
-    stamina: 85,
-    stats: { pace: 72, shooting: 50, passing: 85, dribbling: 72, defending: 84, physical: 85 },
-  }),
-  createPlayer({
-    id: 'p13',
-    name: 'Бендик Сторм',
-    position: 'CDM',
-    foot: 'right',
-    stamina: 80,
-    stats: { pace: 65, shooting: 30, passing: 68, dribbling: 55, defending: 70, physical: 72 },
-  }),
-  createPlayer({
-    id: 'p14',
-    name: 'Лео Маркетти',
-    position: 'CM',
-    foot: 'right',
-    stamina: 88,
-    stats: { pace: 75, shooting: 60, passing: 90, dribbling: 82, defending: 45, physical: 70 },
-  }),
-  createPlayer({
-    id: 'p15',
-    name: 'Грега Новак',
-    position: 'CM',
-    foot: 'left',
-    stamina: 78,
-    stats: { pace: 62, shooting: 40, passing: 72, dribbling: 60, defending: 48, physical: 60 },
-  }),
-  createPlayer({
-    id: 'p16',
-    name: 'Питер ван Дейк',
-    position: 'CM',
-    foot: 'right',
-    stamina: 82,
-    stats: { pace: 66, shooting: 48, passing: 76, dribbling: 66, defending: 52, physical: 66 },
-  }),
-  createPlayer({
-    id: 'p17',
-    name: 'Ильяс Бутрос',
-    position: 'CAM',
-    foot: 'left',
-    stamina: 85,
-    stats: { pace: 88, shooting: 85, passing: 99, dribbling: 98, defending: 30, physical: 70 },
-  }),
-  createPlayer({
-    id: 'p18',
-    name: 'Амаду Траоре',
-    position: 'CAM',
-    foot: 'right',
-    stamina: 80,
-    stats: { pace: 70, shooting: 55, passing: 70, dribbling: 68, defending: 32, physical: 58 },
-  }),
-  createPlayer({
-    id: 'p19',
-    name: 'Уго Делакруа',
-    position: 'LM',
-    foot: 'left',
-    stamina: 84,
-    stats: { pace: 84, shooting: 50, passing: 72, dribbling: 74, defending: 35, physical: 60 },
-  }),
-  createPlayer({
-    id: 'p20',
-    name: 'Ренато Кабрал',
-    position: 'RM',
-    foot: 'right',
-    stamina: 86,
-    stats: { pace: 90, shooting: 72, passing: 80, dribbling: 84, defending: 30, physical: 68 },
-  }),
-  createPlayer({
-    id: 'p21',
-    name: 'Кваме Ансах',
-    position: 'LW',
-    foot: 'right',
-    stamina: 82,
-    stats: { pace: 92, shooting: 68, passing: 62, dribbling: 82, defending: 20, physical: 66 },
-  }),
-  createPlayer({
-    id: 'p22',
-    name: 'Тео Накамура',
-    position: 'RW',
-    foot: 'left',
-    stamina: 80,
-    stats: { pace: 88, shooting: 60, passing: 58, dribbling: 76, defending: 18, physical: 60 },
-  }),
-  createPlayer({
-    id: 'p23',
-    name: 'Бастиан Вульф',
-    position: 'ST',
-    foot: 'right',
-    stamina: 84,
-    stats: { pace: 90, shooting: 96, passing: 60, dribbling: 85, defending: 15, physical: 82 },
-  }),
-  createPlayer({
-    id: 'p24',
-    name: 'Петар Илич',
-    position: 'ST',
-    foot: 'right',
-    stamina: 78,
-    stats: { pace: 80, shooting: 82, passing: 55, dribbling: 72, defending: 12, physical: 76 },
-  }),
-  createPlayer({
-    id: 'p25',
-    name: 'Виктор Эленберг',
-    position: 'GK',
-    foot: 'right',
-    stamina: 80,
-    stats: { pace: 32, shooting: 10, passing: 62, dribbling: 34, defending: 92, physical: 88 },
-  }),
-  createPlayer({
-    id: 'p26',
-    name: 'Тьягу Мендонса',
-    position: 'CB',
-    foot: 'left',
-    stamina: 70,
-    stats: { pace: 68, shooting: 14, passing: 52, dribbling: 42, defending: 71, physical: 74 },
-  }),
-  createPlayer({
-    id: 'p27',
-    name: 'Хассан Зидан',
-    position: 'CB',
-    foot: 'right',
-    stamina: 88,
-    stats: { pace: 84, shooting: 32, passing: 82, dribbling: 70, defending: 95, physical: 90 },
-  }),
-  createPlayer({
-    id: 'p28',
-    name: 'Лукас Феррейра',
-    position: 'LB',
-    foot: 'left',
-    stamina: 86,
-    stats: { pace: 85, shooting: 24, passing: 68, dribbling: 66, defending: 78, physical: 70 },
-  }),
-  createPlayer({
-    id: 'p29',
-    name: 'Джером Аттиас',
-    position: 'RB',
-    foot: 'right',
-    stamina: 68,
-    stats: { pace: 62, shooting: 16, passing: 44, dribbling: 42, defending: 55, physical: 58 },
-  }),
-  createPlayer({
-    id: 'p30',
-    name: 'Роберто Кассано',
-    position: 'RB',
-    foot: 'right',
-    stamina: 90,
-    stats: { pace: 92, shooting: 26, passing: 72, dribbling: 68, defending: 88, physical: 80 },
-  }),
-  createPlayer({
-    id: 'p31',
-    name: 'Мартин Сковгаард',
-    position: 'CDM',
-    foot: 'left',
-    stamina: 70,
-    stats: { pace: 58, shooting: 26, passing: 55, dribbling: 46, defending: 58, physical: 62 },
-  }),
-  createPlayer({
-    id: 'p32',
-    name: 'Юри Коваленко',
-    position: 'CM',
-    foot: 'right',
-    stamina: 90,
-    stats: { pace: 78, shooting: 65, passing: 92, dribbling: 86, defending: 50, physical: 74 },
-  }),
-  createPlayer({
-    id: 'p33',
-    name: 'Абдулай Сарр',
-    position: 'CM',
-    foot: 'right',
-    stamina: 64,
-    stats: { pace: 55, shooting: 32, passing: 50, dribbling: 46, defending: 38, physical: 52 },
-  }),
-  createPlayer({
-    id: 'p34',
-    name: 'Эмре Йылмаз',
-    position: 'CAM',
-    foot: 'right',
-    stamina: 82,
-    stats: { pace: 76, shooting: 70, passing: 84, dribbling: 88, defending: 34, physical: 62 },
-  }),
-  createPlayer({
-    id: 'p35',
-    name: 'Диого Каштру',
-    position: 'LM',
-    foot: 'left',
-    stamina: 60,
-    stats: { pace: 66, shooting: 38, passing: 54, dribbling: 56, defending: 28, physical: 48 },
-  }),
-  createPlayer({
-    id: 'p36',
-    name: 'Санджай Рамасвами',
-    position: 'RM',
-    foot: 'right',
-    stamina: 78,
-    stats: { pace: 82, shooting: 58, passing: 68, dribbling: 74, defending: 26, physical: 58 },
-  }),
-  createPlayer({
-    id: 'p37',
-    name: 'Кайо Соуза',
-    position: 'LW',
-    foot: 'left',
-    stamina: 90,
-    stats: { pace: 96, shooting: 82, passing: 78, dribbling: 94, defending: 24, physical: 72 },
-  }),
-  createPlayer({
-    id: 'p38',
-    name: 'Феликс Одегор',
-    position: 'RW',
-    foot: 'right',
-    stamina: 64,
-    stats: { pace: 70, shooting: 48, passing: 46, dribbling: 60, defending: 15, physical: 50 },
-  }),
-  createPlayer({
-    id: 'p39',
-    name: 'Нунью Баррейру',
-    position: 'CF',
-    foot: 'right',
-    stamina: 82,
-    stats: { pace: 84, shooting: 88, passing: 66, dribbling: 80, defending: 22, physical: 78 },
-  }),
-  createPlayer({
-    id: 'p40',
-    name: 'Такеши Ямамото',
-    position: 'ST',
-    foot: 'left',
-    stamina: 58,
-    stats: { pace: 62, shooting: 60, passing: 44, dribbling: 58, defending: 14, physical: 55 },
-  }),
+/**
+ * AF27's own 100-player database. Every player here is an original
+ * character — real, identifiable professional footballers' names and
+ * likeness aren't used in a publicly deployed pack/rarity gacha
+ * mechanic without the kind of licence EA pays FIFPro for. Stats, the
+ * OVR curve and the value formula are AF27's own — not copied from any
+ * other game's player database.
+ *
+ * Ratings, positions and pack drop weights were generated by a one-off
+ * script (not shipped) that solves each player's stat block to hit an
+ * exact target OVR via calculateOverall, then assigns pack-pull odds
+ * from the required OVR curve — see DROP_WEIGHTS below; the whole
+ * table sums to exactly 1 (verified by the assertion at the bottom of
+ * this file, which runs once on module load).
+ */
+export const ALL_PLAYERS: Player[] = [
+  createPlayer({ id: 'af27-001', name: 'Рион Казама', position: 'ST', foot: 'right', stamina: 90, stats: { pace: 98, shooting: 97, passing: 85, dribbling: 95, defending: 30, physical: 90 } }), // OVR 94, dropWeight 0.006000000
+  createPlayer({ id: 'af27-002', name: 'Адриано Васконселос', position: 'CAM', foot: 'left', stamina: 90, stats: { pace: 95, shooting: 96, passing: 99, dribbling: 99, defending: 75, physical: 85 } }), // OVR 94, dropWeight 0.006000000
+  createPlayer({ id: 'af27-003', name: 'Дуарте Белмиро', position: 'ST', foot: 'right', stamina: 85, stats: { pace: 92, shooting: 99, passing: 88, dribbling: 93, defending: 35, physical: 97 } }), // OVR 94, dropWeight 0.006000000
+  createPlayer({ id: 'af27-004', name: 'Нило Андраде', position: 'RW', foot: 'left', stamina: 88, stats: { pace: 99, shooting: 96, passing: 85, dribbling: 99, defending: 22, physical: 86 } }), // OVR 94, dropWeight 0.006000000
+  createPlayer({ id: 'af27-005', name: 'Матео Кастро', position: 'CB', foot: 'left', stamina: 72, stats: { pace: 97, shooting: 59, passing: 94, dribbling: 76, defending: 97, physical: 97 } }), // OVR 93, dropWeight 0.010000000
+  createPlayer({ id: 'af27-006', name: 'Матео Загорский', position: 'CDM', foot: 'right', stamina: 85, stats: { pace: 97, shooting: 86, passing: 97, dribbling: 97, defending: 82, physical: 77 } }), // OVR 93, dropWeight 0.010000000
+  createPlayer({ id: 'af27-007', name: 'Лукас Ториссон', position: 'LW', foot: 'right', stamina: 60, stats: { pace: 97, shooting: 97, passing: 70, dribbling: 96, defending: 30, physical: 82 } }), // OVR 92, dropWeight 0.016666670
+  createPlayer({ id: 'af27-008', name: 'Энцо Насименту', position: 'RW', foot: 'right', stamina: 73, stats: { pace: 97, shooting: 97, passing: 69, dribbling: 97, defending: 33, physical: 82 } }), // OVR 92, dropWeight 0.016666670
+  createPlayer({ id: 'af27-009', name: 'Рафаэль Ренар', position: 'LM', foot: 'left', stamina: 86, stats: { pace: 97, shooting: 80, passing: 97, dribbling: 97, defending: 81, physical: 79 } }), // OVR 92, dropWeight 0.016666670
+  createPlayer({ id: 'af27-010', name: 'Никлас Ковальски', position: 'RM', foot: 'right', stamina: 61, stats: { pace: 96, shooting: 79, passing: 97, dribbling: 97, defending: 75, physical: 78 } }), // OVR 91, dropWeight 0.015000000
+  createPlayer({ id: 'af27-011', name: 'Эрик Кройц', position: 'LW', foot: 'right', stamina: 74, stats: { pace: 96, shooting: 96, passing: 71, dribbling: 96, defending: 33, physical: 84 } }), // OVR 91, dropWeight 0.015000000
+  createPlayer({ id: 'af27-012', name: 'Йонас Аро', position: 'ST', foot: 'right', stamina: 87, stats: { pace: 96, shooting: 96, passing: 69, dribbling: 96, defending: 35, physical: 84 } }), // OVR 91, dropWeight 0.015000000
+  createPlayer({ id: 'af27-013', name: 'Бруно Коста', position: 'CM', foot: 'left', stamina: 62, stats: { pace: 96, shooting: 77, passing: 97, dribbling: 97, defending: 76, physical: 80 } }), // OVR 91, dropWeight 0.015000000
+  createPlayer({ id: 'af27-014', name: 'Давид Штайнер', position: 'CAM', foot: 'right', stamina: 75, stats: { pace: 84, shooting: 80, passing: 97, dribbling: 97, defending: 78, physical: 80 } }), // OVR 90, dropWeight 0.016000000
+  createPlayer({ id: 'af27-015', name: 'Самуэль Далгаард', position: 'CB', foot: 'right', stamina: 88, stats: { pace: 97, shooting: 54, passing: 78, dribbling: 72, defending: 97, physical: 97 } }), // OVR 90, dropWeight 0.016000000
+  createPlayer({ id: 'af27-016', name: 'Феликс Фонтен', position: 'LB', foot: 'right', stamina: 63, stats: { pace: 95, shooting: 51, passing: 83, dribbling: 70, defending: 97, physical: 97 } }), // OVR 90, dropWeight 0.016000000
+  createPlayer({ id: 'af27-017', name: 'Виктор Соарес', position: 'RW', foot: 'left', stamina: 76, stats: { pace: 96, shooting: 96, passing: 68, dribbling: 95, defending: 33, physical: 79 } }), // OVR 90, dropWeight 0.016000000
+  createPlayer({ id: 'af27-018', name: 'Артур Морено', position: 'CAM', foot: 'right', stamina: 89, stats: { pace: 97, shooting: 74, passing: 97, dribbling: 97, defending: 73, physical: 75 } }), // OVR 90, dropWeight 0.016000000
+  createPlayer({ id: 'af27-019', name: 'Артур Пайва', position: 'CB', foot: 'right', stamina: 64, stats: { pace: 90, shooting: 56, passing: 78, dribbling: 72, defending: 97, physical: 97 } }), // OVR 89, dropWeight 0.000268300
+  createPlayer({ id: 'af27-020', name: 'Оскар Гальвао', position: 'CB', foot: 'right', stamina: 77, stats: { pace: 85, shooting: 52, passing: 83, dribbling: 70, defending: 97, physical: 93 } }), // OVR 88, dropWeight 0.000683930
+  createPlayer({ id: 'af27-021', name: 'Леон Дюваль', position: 'RM', foot: 'left', stamina: 90, stats: { pace: 82, shooting: 78, passing: 96, dribbling: 93, defending: 70, physical: 74 } }), // OVR 87, dropWeight 0.001182320
+  createPlayer({ id: 'af27-022', name: 'Максим Хольм', position: 'CDM', foot: 'right', stamina: 65, stats: { pace: 79, shooting: 73, passing: 96, dribbling: 96, defending: 72, physical: 74 } }), // OVR 86, dropWeight 0.001743420
+  createPlayer({ id: 'af27-023', name: 'Адам Тернер', position: 'RW', foot: 'right', stamina: 78, stats: { pace: 96, shooting: 83, passing: 63, dribbling: 95, defending: 32, physical: 78 } }), // OVR 85, dropWeight 0.002356300
+  createPlayer({ id: 'af27-024', name: 'Тимур Фабрини', position: 'LB', foot: 'right', stamina: 91, stats: { pace: 81, shooting: 52, passing: 73, dribbling: 67, defending: 96, physical: 90 } }), // OVR 84, dropWeight 0.003013870
+  createPlayer({ id: 'af27-025', name: 'Джаспер Вольф', position: 'RW', foot: 'left', stamina: 66, stats: { pace: 94, shooting: 82, passing: 66, dribbling: 90, defending: 29, physical: 77 } }), // OVR 83, dropWeight 0.003711100
+  createPlayer({ id: 'af27-026', name: 'Хави Пеллегрини', position: 'CB', foot: 'right', stamina: 79, stats: { pace: 75, shooting: 51, passing: 76, dribbling: 62, defending: 93, physical: 90 } }), // OVR 82, dropWeight 0.004444180
+  createPlayer({ id: 'af27-027', name: 'Ромео Линдквист', position: 'LW', foot: 'right', stamina: 92, stats: { pace: 96, shooting: 77, passing: 61, dribbling: 92, defending: 25, physical: 69 } }), // OVR 81, dropWeight 0.005210120
+  createPlayer({ id: 'af27-028', name: 'Ансель Мендонса', position: 'GK', foot: 'right', stamina: 67, stats: { pace: 49, shooting: 27, passing: 71, dribbling: 41, defending: 89, physical: 85 } }), // OVR 80, dropWeight 0.006006480
+  createPlayer({ id: 'af27-029', name: 'Кристиан Рицци', position: 'CDM', foot: 'left', stamina: 80, stats: { pace: 73, shooting: 67, passing: 89, dribbling: 86, defending: 70, physical: 65 } }), // OVR 79, dropWeight 0.006831250
+  createPlayer({ id: 'af27-030', name: 'Милан Виейра', position: 'CB', foot: 'right', stamina: 93, stats: { pace: 70, shooting: 43, passing: 74, dribbling: 60, defending: 91, physical: 80 } }), // OVR 78, dropWeight 0.007682720
+  createPlayer({ id: 'af27-031', name: 'Стефан Бергман', position: 'GK', foot: 'right', stamina: 68, stats: { pace: 48, shooting: 24, passing: 71, dribbling: 42, defending: 84, physical: 83 } }), // OVR 77, dropWeight 0.008559410
+  createPlayer({ id: 'af27-032', name: 'Стефан Хансен', position: 'CM', foot: 'right', stamina: 81, stats: { pace: 72, shooting: 62, passing: 83, dribbling: 86, defending: 68, physical: 64 } }), // OVR 76, dropWeight 0.009460040
+  createPlayer({ id: 'af27-033', name: 'Роман Рёйтер', position: 'CAM', foot: 'left', stamina: 94, stats: { pace: 69, shooting: 66, passing: 84, dribbling: 83, defending: 62, physical: 64 } }), // OVR 75, dropWeight 0.010383490
+  createPlayer({ id: 'af27-034', name: 'Эмилио Эклунд', position: 'CDM', foot: 'right', stamina: 69, stats: { pace: 74, shooting: 62, passing: 82, dribbling: 80, defending: 63, physical: 64 } }), // OVR 74, dropWeight 0.011328760
+  createPlayer({ id: 'af27-035', name: 'Густав Бертран', position: 'CDM', foot: 'right', stamina: 82, stats: { pace: 71, shooting: 65, passing: 81, dribbling: 77, defending: 65, physical: 63 } }), // OVR 73, dropWeight 0.012294940
+  createPlayer({ id: 'af27-036', name: 'Бенджамин Абате', position: 'CAM', foot: 'right', stamina: 95, stats: { pace: 68, shooting: 61, passing: 79, dribbling: 82, defending: 59, physical: 63 } }), // OVR 72, dropWeight 0.013281230
+  createPlayer({ id: 'af27-037', name: 'Ноэль Освальдо', position: 'ST', foot: 'left', stamina: 70, stats: { pace: 79, shooting: 70, passing: 53, dribbling: 80, defending: 26, physical: 67 } }), // OVR 71, dropWeight 0.014286890
+  createPlayer({ id: 'af27-038', name: 'Дамиан Сандер', position: 'CAM', foot: 'right', stamina: 83, stats: { pace: 70, shooting: 60, passing: 74, dribbling: 77, defending: 63, physical: 63 } }), // OVR 70, dropWeight 0.015311250
+  createPlayer({ id: 'af27-039', name: 'Ренцо Мбенг', position: 'LB', foot: 'right', stamina: 58, stats: { pace: 67, shooting: 39, passing: 59, dribbling: 53, defending: 79, physical: 76 } }), // OVR 69, dropWeight 0.016353710
+  createPlayer({ id: 'af27-040', name: 'Йоав Гарнье', position: 'CM', foot: 'right', stamina: 71, stats: { pace: 64, shooting: 60, passing: 78, dribbling: 71, defending: 59, physical: 54 } }), // OVR 68, dropWeight 0.017413690
+  createPlayer({ id: 'af27-041', name: 'Каспиан Обрин', position: 'RWB', foot: 'left', stamina: 84, stats: { pace: 61, shooting: 39, passing: 61, dribbling: 56, defending: 78, physical: 68 } }), // OVR 67, dropWeight 0.018490680
+  createPlayer({ id: 'af27-042', name: 'Элай Экберг', position: 'RM', foot: 'right', stamina: 59, stats: { pace: 66, shooting: 59, passing: 71, dribbling: 73, defending: 55, physical: 54 } }), // OVR 66, dropWeight 0.019584180
+  createPlayer({ id: 'af27-043', name: 'Северин Хайнц', position: 'LM', foot: 'right', stamina: 72, stats: { pace: 62, shooting: 55, passing: 73, dribbling: 70, defending: 57, physical: 54 } }), // OVR 65, dropWeight 0.010346880
+  createPlayer({ id: 'af27-044', name: 'Иво Ланге', position: 'RB', foot: 'right', stamina: 85, stats: { pace: 60, shooting: 35, passing: 55, dribbling: 49, defending: 77, physical: 67 } }), // OVR 65, dropWeight 0.010346880
+  createPlayer({ id: 'af27-045', name: 'Марсело Кастро', position: 'CB', foot: 'left', stamina: 60, stats: { pace: 57, shooting: 39, passing: 60, dribbling: 55, defending: 73, physical: 67 } }), // OVR 64, dropWeight 0.010909490
+  createPlayer({ id: 'af27-046', name: 'Марсело Загорский', position: 'CM', foot: 'right', stamina: 73, stats: { pace: 63, shooting: 52, passing: 70, dribbling: 72, defending: 56, physical: 55 } }), // OVR 64, dropWeight 0.010909490
+  createPlayer({ id: 'af27-047', name: 'Теодор Ториссон', position: 'GK', foot: 'right', stamina: 86, stats: { pace: 38, shooting: 21, passing: 56, dribbling: 32, defending: 68, physical: 70 } }), // OVR 63, dropWeight 0.011479720
+  createPlayer({ id: 'af27-048', name: 'Юрген Насименту', position: 'CF', foot: 'right', stamina: 61, stats: { pace: 71, shooting: 64, passing: 45, dribbling: 68, defending: 21, physical: 59 } }), // OVR 63, dropWeight 0.011479720
+  createPlayer({ id: 'af27-049', name: 'Матео Ренар', position: 'CM', foot: 'left', stamina: 74, stats: { pace: 55, shooting: 56, passing: 71, dribbling: 65, defending: 55, physical: 55 } }), // OVR 62, dropWeight 0.008038270
+  createPlayer({ id: 'af27-050', name: 'Лукас Ковальски', position: 'CB', foot: 'right', stamina: 87, stats: { pace: 61, shooting: 37, passing: 58, dribbling: 52, defending: 68, physical: 68 } }), // OVR 62, dropWeight 0.008038270
+  createPlayer({ id: 'af27-051', name: 'Энцо Кройц', position: 'LWB', foot: 'right', stamina: 62, stats: { pace: 59, shooting: 41, passing: 57, dribbling: 51, defending: 68, physical: 69 } }), // OVR 62, dropWeight 0.008038270
+  createPlayer({ id: 'af27-052', name: 'Рафаэль Аро', position: 'CDM', foot: 'right', stamina: 75, stats: { pace: 56, shooting: 52, passing: 70, dribbling: 66, defending: 54, physical: 48 } }), // OVR 61, dropWeight 0.008428230
+  createPlayer({ id: 'af27-053', name: 'Никлас Коста', position: 'CM', foot: 'left', stamina: 88, stats: { pace: 61, shooting: 49, passing: 71, dribbling: 65, defending: 49, physical: 49 } }), // OVR 61, dropWeight 0.008428230
+  createPlayer({ id: 'af27-054', name: 'Эрик Штайнер', position: 'CB', foot: 'right', stamina: 63, stats: { pace: 59, shooting: 38, passing: 59, dribbling: 53, defending: 68, physical: 62 } }), // OVR 61, dropWeight 0.008428230
+  createPlayer({ id: 'af27-055', name: 'Йонас Далгаард', position: 'CB', foot: 'right', stamina: 76, stats: { pace: 56, shooting: 34, passing: 56, dribbling: 50, defending: 69, physical: 61 } }), // OVR 60, dropWeight 0.008822930
+  createPlayer({ id: 'af27-056', name: 'Бруно Фонтен', position: 'LW', foot: 'right', stamina: 89, stats: { pace: 66, shooting: 61, passing: 45, dribbling: 66, defending: 20, physical: 53 } }), // OVR 60, dropWeight 0.008822930
+  createPlayer({ id: 'af27-057', name: 'Давид Соарес', position: 'RM', foot: 'left', stamina: 64, stats: { pace: 60, shooting: 50, passing: 67, dribbling: 65, defending: 51, physical: 51 } }), // OVR 60, dropWeight 0.008822930
+  createPlayer({ id: 'af27-058', name: 'Самуэль Морено', position: 'CDM', foot: 'right', stamina: 77, stats: { pace: 57, shooting: 54, passing: 65, dribbling: 62, defending: 53, physical: 51 } }), // OVR 59, dropWeight 0.009222260
+  createPlayer({ id: 'af27-059', name: 'Самуэль Пайва', position: 'ST', foot: 'right', stamina: 90, stats: { pace: 67, shooting: 55, passing: 48, dribbling: 68, defending: 20, physical: 54 } }), // OVR 59, dropWeight 0.009222260
+  createPlayer({ id: 'af27-060', name: 'Феликс Гальвао', position: 'ST', foot: 'right', stamina: 65, stats: { pace: 65, shooting: 58, passing: 46, dribbling: 66, defending: 21, physical: 55 } }), // OVR 59, dropWeight 0.009222260
+  createPlayer({ id: 'af27-061', name: 'Виктор Дюваль', position: 'RB', foot: 'left', stamina: 78, stats: { pace: 58, shooting: 36, passing: 52, dribbling: 46, defending: 65, physical: 63 } }), // OVR 58, dropWeight 0.009626120
+  createPlayer({ id: 'af27-062', name: 'Артур Хольм', position: 'GK', foot: 'right', stamina: 91, stats: { pace: 35, shooting: 20, passing: 51, dribbling: 27, defending: 62, physical: 67 } }), // OVR 58, dropWeight 0.009626120
+  createPlayer({ id: 'af27-063', name: 'Оскар Тернер', position: 'LB', foot: 'right', stamina: 66, stats: { pace: 53, shooting: 37, passing: 49, dribbling: 42, defending: 68, physical: 65 } }), // OVR 58, dropWeight 0.009626120
+  createPlayer({ id: 'af27-064', name: 'Леон Фабрини', position: 'RW', foot: 'right', stamina: 79, stats: { pace: 62, shooting: 56, passing: 46, dribbling: 65, defending: 24, physical: 48 } }), // OVR 57, dropWeight 0.010034430
+  createPlayer({ id: 'af27-065', name: 'Максим Вольф', position: 'LM', foot: 'left', stamina: 92, stats: { pace: 56, shooting: 52, passing: 62, dribbling: 63, defending: 47, physical: 45 } }), // OVR 57, dropWeight 0.010034430
+  createPlayer({ id: 'af27-066', name: 'Адам Пеллегрини', position: 'CM', foot: 'right', stamina: 67, stats: { pace: 54, shooting: 49, passing: 64, dribbling: 62, defending: 50, physical: 46 } }), // OVR 57, dropWeight 0.010034430
+  createPlayer({ id: 'af27-067', name: 'Тимур Линдквист', position: 'CM', foot: 'right', stamina: 80, stats: { pace: 51, shooting: 44, passing: 67, dribbling: 59, defending: 44, physical: 46 } }), // OVR 56, dropWeight 0.010447100
+  createPlayer({ id: 'af27-068', name: 'Джаспер Мендонса', position: 'GK', foot: 'right', stamina: 93, stats: { pace: 37, shooting: 20, passing: 47, dribbling: 31, defending: 61, physical: 61 } }), // OVR 56, dropWeight 0.010447100
+  createPlayer({ id: 'af27-069', name: 'Хави Рицци', position: 'CM', foot: 'left', stamina: 68, stats: { pace: 55, shooting: 45, passing: 62, dribbling: 63, defending: 49, physical: 47 } }), // OVR 56, dropWeight 0.010447100
+  createPlayer({ id: 'af27-070', name: 'Ромео Виейра', position: 'GK', foot: 'right', stamina: 81, stats: { pace: 32, shooting: 20, passing: 51, dribbling: 27, defending: 59, physical: 61 } }), // OVR 55, dropWeight 0.010864030
+  createPlayer({ id: 'af27-071', name: 'Ансель Бергман', position: 'CAM', foot: 'right', stamina: 94, stats: { pace: 50, shooting: 46, passing: 64, dribbling: 59, defending: 46, physical: 48 } }), // OVR 55, dropWeight 0.010864030
+  createPlayer({ id: 'af27-072', name: 'Ансель Хансен', position: 'CAM', foot: 'right', stamina: 69, stats: { pace: 55, shooting: 50, passing: 61, dribbling: 57, defending: 49, physical: 48 } }), // OVR 55, dropWeight 0.010864030
+  createPlayer({ id: 'af27-073', name: 'Кристиан Рёйтер', position: 'CF', foot: 'left', stamina: 82, stats: { pace: 63, shooting: 52, passing: 37, dribbling: 62, defending: 20, physical: 51 } }), // OVR 54, dropWeight 0.008463860
+  createPlayer({ id: 'af27-074', name: 'Милан Эклунд', position: 'RB', foot: 'right', stamina: 95, stats: { pace: 50, shooting: 29, passing: 51, dribbling: 44, defending: 61, physical: 60 } }), // OVR 54, dropWeight 0.008463860
+  createPlayer({ id: 'af27-075', name: 'Стефан Бертран', position: 'CDM', foot: 'right', stamina: 70, stats: { pace: 48, shooting: 47, passing: 60, dribbling: 59, defending: 48, physical: 49 } }), // OVR 54, dropWeight 0.008463860
+  createPlayer({ id: 'af27-076', name: 'Роман Абате', position: 'ST', foot: 'right', stamina: 83, stats: { pace: 65, shooting: 54, passing: 40, dribbling: 57, defending: 20, physical: 45 } }), // OVR 54, dropWeight 0.008463860
+  createPlayer({ id: 'af27-077', name: 'Эмилио Освальдо', position: 'LWB', foot: 'left', stamina: 58, stats: { pace: 51, shooting: 34, passing: 46, dribbling: 46, defending: 62, physical: 52 } }), // OVR 53, dropWeight 0.008782790
+  createPlayer({ id: 'af27-078', name: 'Густав Сандер', position: 'RB', foot: 'right', stamina: 71, stats: { pace: 49, shooting: 31, passing: 44, dribbling: 44, defending: 64, physical: 53 } }), // OVR 53, dropWeight 0.008782790
+  createPlayer({ id: 'af27-079', name: 'Бенджамин Мбенг', position: 'CF', foot: 'right', stamina: 84, stats: { pace: 57, shooting: 55, passing: 42, dribbling: 58, defending: 20, physical: 46 } }), // OVR 53, dropWeight 0.008782790
+  createPlayer({ id: 'af27-080', name: 'Ноэль Гарнье', position: 'LW', foot: 'right', stamina: 59, stats: { pace: 63, shooting: 52, passing: 41, dribbling: 57, defending: 20, physical: 46 } }), // OVR 53, dropWeight 0.008782790
+  createPlayer({ id: 'af27-081', name: 'Дамиан Обрин', position: 'CM', foot: 'left', stamina: 72, stats: { pace: 50, shooting: 41, passing: 61, dribbling: 54, defending: 47, physical: 44 } }), // OVR 52, dropWeight 0.009104750
+  createPlayer({ id: 'af27-082', name: 'Ренцо Экберг', position: 'LM', foot: 'right', stamina: 85, stats: { pace: 47, shooting: 45, passing: 57, dribbling: 60, defending: 42, physical: 44 } }), // OVR 52, dropWeight 0.009104750
+  createPlayer({ id: 'af27-083', name: 'Йоав Хайнц', position: 'LM', foot: 'right', stamina: 60, stats: { pace: 53, shooting: 42, passing: 57, dribbling: 58, defending: 45, physical: 45 } }), // OVR 52, dropWeight 0.009104750
+  createPlayer({ id: 'af27-084', name: 'Каспиан Ланге', position: 'CM', foot: 'right', stamina: 73, stats: { pace: 51, shooting: 46, passing: 55, dribbling: 57, defending: 48, physical: 46 } }), // OVR 52, dropWeight 0.009104750
+  createPlayer({ id: 'af27-085', name: 'Элай Кастро', position: 'GK', foot: 'left', stamina: 86, stats: { pace: 30, shooting: 20, passing: 47, dribbling: 23, defending: 54, physical: 58 } }), // OVR 51, dropWeight 0.009429690
+  createPlayer({ id: 'af27-086', name: 'Элай Загорский', position: 'GK', foot: 'right', stamina: 61, stats: { pace: 28, shooting: 20, passing: 45, dribbling: 29, defending: 54, physical: 59 } }), // OVR 51, dropWeight 0.009429690
+  createPlayer({ id: 'af27-087', name: 'Северин Ториссон', position: 'ST', foot: 'right', stamina: 74, stats: { pace: 62, shooting: 47, passing: 36, dribbling: 58, defending: 22, physical: 49 } }), // OVR 51, dropWeight 0.009429690
+  createPlayer({ id: 'af27-088', name: 'Иво Насименту', position: 'RM', foot: 'right', stamina: 87, stats: { pace: 50, shooting: 40, passing: 59, dribbling: 57, defending: 42, physical: 39 } }), // OVR 51, dropWeight 0.009429690
+  createPlayer({ id: 'af27-089', name: 'Марсело Ренар', position: 'CB', foot: 'left', stamina: 62, stats: { pace: 47, shooting: 31, passing: 47, dribbling: 39, defending: 58, physical: 49 } }), // OVR 50, dropWeight 0.009757560
+  createPlayer({ id: 'af27-090', name: 'Теодор Ковальски', position: 'LB', foot: 'right', stamina: 75, stats: { pace: 45, shooting: 27, passing: 45, dribbling: 37, defending: 59, physical: 50 } }), // OVR 50, dropWeight 0.009757560
+  createPlayer({ id: 'af27-091', name: 'Юрген Кройц', position: 'CF', foot: 'right', stamina: 88, stats: { pace: 60, shooting: 47, passing: 36, dribbling: 58, defending: 20, physical: 43 } }), // OVR 50, dropWeight 0.009757560
+  createPlayer({ id: 'af27-092', name: 'Матео Аро', position: 'LB', foot: 'right', stamina: 63, stats: { pace: 48, shooting: 28, passing: 42, dribbling: 41, defending: 59, physical: 51 } }), // OVR 50, dropWeight 0.009757560
+  createPlayer({ id: 'af27-093', name: 'Лукас Коста', position: 'CB', foot: 'left', stamina: 76, stats: { pace: 45, shooting: 32, passing: 48, dribbling: 39, defending: 55, physical: 51 } }), // OVR 49, dropWeight 0.010088310
+  createPlayer({ id: 'af27-094', name: 'Энцо Штайнер', position: 'RM', foot: 'right', stamina: 89, stats: { pace: 43, shooting: 41, passing: 59, dribbling: 52, defending: 41, physical: 42 } }), // OVR 49, dropWeight 0.010088310
+  createPlayer({ id: 'af27-095', name: 'Рафаэль Далгаард', position: 'RB', foot: 'right', stamina: 64, stats: { pace: 49, shooting: 25, passing: 44, dribbling: 35, defending: 57, physical: 52 } }), // OVR 49, dropWeight 0.010088310
+  createPlayer({ id: 'af27-096', name: 'Никлас Фонтен', position: 'LM', foot: 'right', stamina: 77, stats: { pace: 47, shooting: 42, passing: 54, dribbling: 56, defending: 38, physical: 43 } }), // OVR 49, dropWeight 0.010088310
+  createPlayer({ id: 'af27-097', name: 'Эрик Соарес', position: 'RWB', foot: 'left', stamina: 90, stats: { pace: 44, shooting: 26, passing: 40, dribbling: 39, defending: 57, physical: 52 } }), // OVR 48, dropWeight 0.010421900
+  createPlayer({ id: 'af27-098', name: 'Йонас Морено', position: 'RB', foot: 'right', stamina: 65, stats: { pace: 42, shooting: 30, passing: 46, dribbling: 37, defending: 55, physical: 53 } }), // OVR 48, dropWeight 0.010421900
+  createPlayer({ id: 'af27-099', name: 'Йонас Пайва', position: 'CB', foot: 'right', stamina: 78, stats: { pace: 48, shooting: 27, passing: 45, dribbling: 36, defending: 53, physical: 54 } }), // OVR 48, dropWeight 0.010421900
+  createPlayer({ id: 'af27-100', name: 'Бруно Гальвао', position: 'LW', foot: 'right', stamina: 91, stats: { pace: 55, shooting: 44, passing: 36, dribbling: 56, defending: 20, physical: 47 } }), // OVR 48, dropWeight 0.010421900
+]
+
+/** Exact per-player pack-pull probability (sums to 1 across all 100):
+ *  - 94 OVR (4 players, the Legendary tier): 0.6% each = 2.4% total
+ *  - 93 OVR: 2% total · 92 OVR: 5% total · 91 OVR: 6% total · 90 OVR: 8% total
+ *  - everything below 90 OVR splits the remaining 76.6%, weighted so a
+ *    lower rating is always more common than a higher one. */
+export const DROP_WEIGHTS: Record<string, number> = {
+  'af27-001': 0.006000000,
+  'af27-002': 0.006000000,
+  'af27-003': 0.006000000,
+  'af27-004': 0.006000000,
+  'af27-005': 0.010000000,
+  'af27-006': 0.010000000,
+  'af27-007': 0.016666670,
+  'af27-008': 0.016666670,
+  'af27-009': 0.016666670,
+  'af27-010': 0.015000000,
+  'af27-011': 0.015000000,
+  'af27-012': 0.015000000,
+  'af27-013': 0.015000000,
+  'af27-014': 0.016000000,
+  'af27-015': 0.016000000,
+  'af27-016': 0.016000000,
+  'af27-017': 0.016000000,
+  'af27-018': 0.016000000,
+  'af27-019': 0.000268300,
+  'af27-020': 0.000683930,
+  'af27-021': 0.001182320,
+  'af27-022': 0.001743420,
+  'af27-023': 0.002356300,
+  'af27-024': 0.003013870,
+  'af27-025': 0.003711100,
+  'af27-026': 0.004444180,
+  'af27-027': 0.005210120,
+  'af27-028': 0.006006480,
+  'af27-029': 0.006831250,
+  'af27-030': 0.007682720,
+  'af27-031': 0.008559410,
+  'af27-032': 0.009460040,
+  'af27-033': 0.010383490,
+  'af27-034': 0.011328760,
+  'af27-035': 0.012294940,
+  'af27-036': 0.013281230,
+  'af27-037': 0.014286890,
+  'af27-038': 0.015311250,
+  'af27-039': 0.016353710,
+  'af27-040': 0.017413690,
+  'af27-041': 0.018490680,
+  'af27-042': 0.019584180,
+  'af27-043': 0.010346880,
+  'af27-044': 0.010346880,
+  'af27-045': 0.010909490,
+  'af27-046': 0.010909490,
+  'af27-047': 0.011479720,
+  'af27-048': 0.011479720,
+  'af27-049': 0.008038270,
+  'af27-050': 0.008038270,
+  'af27-051': 0.008038270,
+  'af27-052': 0.008428230,
+  'af27-053': 0.008428230,
+  'af27-054': 0.008428230,
+  'af27-055': 0.008822930,
+  'af27-056': 0.008822930,
+  'af27-057': 0.008822930,
+  'af27-058': 0.009222260,
+  'af27-059': 0.009222260,
+  'af27-060': 0.009222260,
+  'af27-061': 0.009626120,
+  'af27-062': 0.009626120,
+  'af27-063': 0.009626120,
+  'af27-064': 0.010034430,
+  'af27-065': 0.010034430,
+  'af27-066': 0.010034430,
+  'af27-067': 0.010447100,
+  'af27-068': 0.010447100,
+  'af27-069': 0.010447100,
+  'af27-070': 0.010864030,
+  'af27-071': 0.010864030,
+  'af27-072': 0.010864030,
+  'af27-073': 0.008463860,
+  'af27-074': 0.008463860,
+  'af27-075': 0.008463860,
+  'af27-076': 0.008463860,
+  'af27-077': 0.008782790,
+  'af27-078': 0.008782790,
+  'af27-079': 0.008782790,
+  'af27-080': 0.008782790,
+  'af27-081': 0.009104750,
+  'af27-082': 0.009104750,
+  'af27-083': 0.009104750,
+  'af27-084': 0.009104750,
+  'af27-085': 0.009429690,
+  'af27-086': 0.009429690,
+  'af27-087': 0.009429690,
+  'af27-088': 0.009429690,
+  'af27-089': 0.009757560,
+  'af27-090': 0.009757560,
+  'af27-091': 0.009757560,
+  'af27-092': 0.009757560,
+  'af27-093': 0.010088310,
+  'af27-094': 0.010088310,
+  'af27-095': 0.010088310,
+  'af27-096': 0.010088310,
+  'af27-097': 0.010421900,
+  'af27-098': 0.010421900,
+  'af27-099': 0.010421900,
+  'af27-100': 0.010421900,
+}
+
+/** Owned for free from the start, across the lower Common/Rare tiers, so a
+ * match is always playable without opening a single pack. Every one of
+ * these 100 players — including these — can still be pulled from packs
+ * or bought on the transfer market. */
+export const STARTING_ROSTER_IDS: string[] = [
+  'af27-085', 'af27-086', 'af27-099', 'af27-093', 'af27-089', 'af27-055', 'af27-090', 'af27-092', 'af27-098', 'af27-095', 'af27-077', 'af27-097', 'af27-075', 'af27-058', 'af27-052', 'af27-081', 'af27-084', 'af27-067', 'af27-071', 'af27-072', 'af27-096', 'af27-082', 'af27-094', 'af27-088', 'af27-100', 'af27-080', 'af27-064', 'af27-025', 'af27-091', 'af27-087', 'af27-076', 'af27-059',
 ]
 
 export function getPlayerById(id: string): Player | undefined {
-  return CLUB_PLAYERS.find((p) => p.id === id)
+  return ALL_PLAYERS.find((p) => p.id === id)
+}
+
+const weightSum = Object.values(DROP_WEIGHTS).reduce((a, b) => a + b, 0)
+if (Math.abs(weightSum - 1) > 1e-9) {
+  throw new Error(`AF27 player pool drop weights must sum to 1, got ${weightSum}`)
+}
+if (ALL_PLAYERS.length !== 100) {
+  throw new Error(`AF27 player pool must contain exactly 100 players, got ${ALL_PLAYERS.length}`)
+}
+if (new Set(ALL_PLAYERS.map((p) => p.name)).size !== ALL_PLAYERS.length) {
+  throw new Error('AF27 player pool contains duplicate names')
+}
+if (ALL_PLAYERS.filter((p) => p.rating === 94).length !== 4) {
+  throw new Error('AF27 player pool must have exactly 4 players rated 94')
 }

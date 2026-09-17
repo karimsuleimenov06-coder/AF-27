@@ -17,7 +17,7 @@ export type Position =
 
 export type PositionGroup = 'GK' | 'DEF' | 'MID' | 'ATT'
 
-export type Rarity = 'bronze' | 'silver' | 'gold' | 'special' | 'icon' | 'promo'
+export type Rarity = 'common' | 'rare' | 'epic' | 'legendary' | 'promo'
 
 export type Foot = 'left' | 'right'
 
@@ -86,12 +86,21 @@ export const POSITION_GROUP_LABEL: Record<PositionGroup, string> = {
 }
 
 export const RARITY_LABEL: Record<Rarity, string> = {
-  bronze: 'Бронза',
-  silver: 'Серебро',
-  gold: 'Золото',
-  special: 'Astra',
-  icon: 'Icon',
+  common: 'Common',
+  rare: 'Rare',
+  epic: 'Epic',
+  legendary: 'Legendary',
   promo: 'BETA',
+}
+
+/** Rarity multiplies a player's base OVR-driven market value — AF27's own
+ * curve, not copied from any other game's economy. */
+export const RARITY_VALUE_MULT: Record<Rarity, number> = {
+  common: 1,
+  rare: 1.15,
+  epic: 1.4,
+  legendary: 1.85,
+  promo: 1.6,
 }
 
 const OVERALL_WEIGHTS: Record<PositionGroup, PlayerStats> = {
@@ -113,16 +122,22 @@ export function calculateOverall(position: Position, stats: PlayerStats): number
   return Math.round(weighted)
 }
 
+/** Rarity is purely OVR-derived: the four 94-rated players are the only
+ * ones that can ever land in 'legendary' as a natural consequence of the
+ * band, not a separate hard-coded flag (see data/players.ts). 'promo' is
+ * the one exception — it's never assigned by this function, only pinned
+ * directly on hand-placed promo cards (see data/promoCards.ts). */
 export function getRarity(rating: number): Rarity {
-  if (rating >= 85) return 'special'
-  if (rating >= 75) return 'gold'
-  if (rating >= 65) return 'silver'
-  return 'bronze'
+  if (rating >= 94) return 'legendary'
+  if (rating >= 85) return 'epic'
+  if (rating >= 70) return 'rare'
+  return 'common'
 }
 
-export function calculateValue(rating: number): number {
+export function calculateValue(rating: number, rarity: Rarity = getRarity(rating)): number {
   const raw = Math.pow(Math.max(rating - 30, 1), 3) / 25
-  return Math.round(raw / 50) * 50
+  const base = Math.round(raw / 50) * 50
+  return Math.round((base * RARITY_VALUE_MULT[rarity]) / 50) * 50
 }
 
 export function createPlayer(input: {
@@ -134,6 +149,7 @@ export function createPlayer(input: {
   foot: Foot
 }): Player {
   const rating = calculateOverall(input.position, input.stats)
+  const rarity = getRarity(rating)
   return {
     id: input.id,
     name: input.name,
@@ -142,7 +158,7 @@ export function createPlayer(input: {
     stamina: input.stamina,
     foot: input.foot,
     rating,
-    rarity: getRarity(rating),
-    value: calculateValue(rating),
+    rarity,
+    value: calculateValue(rating, rarity),
   }
 }

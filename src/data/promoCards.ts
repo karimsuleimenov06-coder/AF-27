@@ -5,7 +5,9 @@ import { calculateOverall, calculateValue, type Player } from '../types/player'
  * never on the transfer market, and not part of the standard 40-player
  * club roster. Same real-athlete-likeness reasoning as data/icons.ts: this
  * is a publicly deployed product, so promo cards here are original
- * characters rather than real, identifiable professional footballers.
+ * characters rather than real, identifiable professional footballers. Also
+ * excluded from the 100-player AF27 database (data/players.ts) and its
+ * pack drop table — this card only ever enters a collection via redeem().
  */
 
 const BETA_STATS = { pace: 97, shooting: 85, passing: 78, dribbling: 92, defending: 36, physical: 78 }
@@ -21,6 +23,6 @@ export const BETA_PROMO_PLAYER: Player = (() => {
     foot: 'right',
     rating,
     rarity: 'promo',
-    value: calculateValue(rating),
+    value: calculateValue(rating, 'promo'),
   }
 })()
