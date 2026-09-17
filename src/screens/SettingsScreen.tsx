@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { GraphicsQuality } from '../state/appStore'
 import { useAppStore } from '../state/appStore'
+import { usePromoStore, type RedeemResult } from '../state/promoStore'
 import Toggle from '../components/Toggle'
 
 const qualityOptions: { value: GraphicsQuality; label: string }[] = [
@@ -33,6 +34,60 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
   )
 }
 
+function PromoSection() {
+  const redeem = usePromoStore((s) => s.redeem)
+  const [code, setCode] = useState('')
+  const [feedback, setFeedback] = useState<RedeemResult | null>(null)
+
+  const activate = () => {
+    if (!code.trim()) return
+    const result = redeem(code)
+    setFeedback(result)
+    if (result.success) setCode('')
+  }
+
+  return (
+    <Section title="Промокод">
+      <div className="flex flex-col gap-2.5 px-3.5 py-3.5">
+        <div className="flex gap-2">
+          <input
+            value={code}
+            onChange={(e) => {
+              setCode(e.target.value)
+              setFeedback(null)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') activate()
+            }}
+            placeholder="Введите промокод"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
+            className="min-w-0 flex-1 rounded-xl border border-border bg-surface-2 px-3.5 py-3 font-display text-sm font-semibold tracking-wide text-white uppercase placeholder:text-ink-2 placeholder:normal-case focus:border-cyan focus:outline-none"
+          />
+          <button
+            onClick={activate}
+            disabled={!code.trim()}
+            className="shrink-0 rounded-xl bg-gradient-to-r from-cyan to-violet px-5 py-3 font-display text-sm font-bold text-night active:scale-[0.97] disabled:opacity-40"
+          >
+            Активировать
+          </button>
+        </div>
+        {feedback && (
+          <p
+            className={`rounded-lg px-3 py-2.5 text-sm font-semibold ${
+              feedback.success ? 'bg-cyan/10 text-cyan' : 'bg-danger/10 text-danger'
+            }`}
+          >
+            {feedback.success ? '✅ ' : '⚠️ '}
+            {feedback.message}
+          </p>
+        )}
+      </div>
+    </Section>
+  )
+}
+
 export default function SettingsScreen() {
   const settings = useAppStore((s) => s.settings)
   const profile = useAppStore((s) => s.profile)
@@ -50,6 +105,8 @@ export default function SettingsScreen() {
           </span>
         </Row>
       </Section>
+
+      <PromoSection />
 
       <Section title="Графика">
         <Row label="Авто-качество" hint="Игра сама подстраивает графику под ваше устройство">

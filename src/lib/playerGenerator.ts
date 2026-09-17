@@ -10,6 +10,9 @@ const RATING_BAND: Record<Rarity, [number, number]> = {
   // only exists so the Record stays exhaustive; generatePlayer('icon', ...)
   // should never actually be called.
   icon: [94, 94],
+  // Promo cards (see data/promoCards.ts) are hand-placed and redeemed via
+  // code only — never rolled by a pack or the transfer market.
+  promo: [87, 87],
 }
 
 const WEIGHTED_POSITIONS: Position[] = [

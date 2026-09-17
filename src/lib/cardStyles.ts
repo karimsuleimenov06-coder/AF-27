@@ -44,6 +44,16 @@ export const RARITY_STYLE: Record<Rarity, RarityStyle> = {
     text: 'text-white',
     chipBg: 'bg-night text-gold-2 border-gold-2/60',
   },
+  // Promo-exclusive cards (see data/promoCards.ts) get their own distinct
+  // "holographic" look — never seen on a pack pull, so it needs to read as
+  // clearly different from every rarity a player can actually roll.
+  promo: {
+    gradient: 'from-cyan via-violet to-danger',
+    ring: 'ring-violet/70',
+    glow: 'shadow-cyan/50',
+    text: 'text-white',
+    chipBg: 'bg-violet/20 text-white border-cyan/50',
+  },
 }
 
 export const POSITION_GROUP_ACCENT: Record<PositionGroup, string> = {

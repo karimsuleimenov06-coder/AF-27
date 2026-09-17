@@ -23,6 +23,7 @@ const RARITY_DONOR_BONUS: Record<Rarity, number> = {
   gold: 160,
   special: 420,
   icon: 2000,
+  promo: 1500,
 }
 
 /** How much XP feeding `donor` into another player's progress is worth.

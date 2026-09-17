@@ -38,6 +38,15 @@ export default function PlayerCard({ player, size = 'sm', onClick }: Props) {
         }}
       >
         <div className={`absolute inset-0 bg-gradient-to-br ${rarityStyle.gradient} -z-10`} />
+        {player.rarity === 'promo' && (
+          <span
+            className={`absolute top-1.5 right-1.5 rounded-full border border-white/40 bg-black/30 font-display font-bold tracking-wider text-white uppercase ${
+              lg ? 'px-2.5 py-1 text-[10px]' : 'px-1.5 py-0.5 text-[8px]'
+            }`}
+          >
+            Промо
+          </span>
+        )}
 
         <div className="flex items-start justify-between">
           <div className={rarityStyle.text}>

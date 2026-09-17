@@ -3,7 +3,7 @@ import { generatePlayer, rollRarity } from './playerGenerator'
 import { pickRandomIcon } from '../data/icons'
 import type { Player, Rarity } from '../types/player'
 
-const RARITY_RANK: Record<Rarity, number> = { bronze: 0, silver: 1, gold: 2, special: 3, icon: 4 }
+const RARITY_RANK: Record<Rarity, number> = { bronze: 0, silver: 1, gold: 2, special: 3, icon: 4, promo: 5 }
 
 export function openPack(pack: PackTier): Player[] {
   const rarities: Rarity[] = []
