@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom'
-import { HomeIcon, PackIcon, SettingsIcon, SquadIcon, TransferIcon, TrophyIcon } from './Icons'
+import { HomeIcon, PackIcon, SettingsIcon, SquadIcon, TransferIcon, TrophyIcon, UpgradeIcon } from './Icons'
 
 const items = [
   { to: '/', label: 'Главная', Icon: HomeIcon, end: true },
   { to: '/squad', label: 'Состав', Icon: SquadIcon },
   { to: '/packs', label: 'Паки', Icon: PackIcon },
   { to: '/transfers', label: 'Трансферы', Icon: TransferIcon },
+  { to: '/upgrades', label: 'Улучшение', Icon: UpgradeIcon },
   { to: '/tournaments', label: 'Турниры', Icon: TrophyIcon },
   { to: '/settings', label: 'Настройки', Icon: SettingsIcon },
 ]

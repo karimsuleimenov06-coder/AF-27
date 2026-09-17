@@ -1,40 +1,44 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { PlayerStats } from '../types/player'
+import type { Player, PlayerStats } from '../types/player'
+import { applyXpGain } from '../lib/xp'
+import { useCollectionStore } from './collectionStore'
 
 export type StatBoosts = Partial<Record<keyof PlayerStats, number>>
 
 interface UpgradesState {
   boosts: Record<string, StatBoosts>
-  trainingPoints: Record<string, number>
-  boostStat: (playerId: string, stat: keyof PlayerStats, amount: number) => void
-  addTrainingPoints: (playerId: string, amount: number) => void
-  spendTrainingPoint: (playerId: string) => boolean
+  xp: Record<string, number>
+  protectedIds: Record<string, boolean>
+  /** Feeds `donorId` (removed from the collection permanently) into
+   * `targetBasePlayer`'s XP progress. `xpGain` is precomputed by the caller
+   * via lib/xp's xpFromDonor so the confirmation UI and the actual effect
+   * always agree on the same number. */
+  sacrifice: (donorId: string, targetBasePlayer: Player, xpGain: number) => void
+  toggleProtected: (playerId: string) => void
 }
-
-export const UPGRADE_COST_COINS = 400
-export const MAX_BOOST_PER_STAT = 15
 
 export const useUpgradesStore = create<UpgradesState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       boosts: {},
-      trainingPoints: {},
-      boostStat: (playerId, stat, amount) =>
+      xp: {},
+      protectedIds: {},
+      sacrifice: (donorId, targetBasePlayer, xpGain) => {
         set((s) => {
-          const current = s.boosts[playerId] ?? {}
-          const next = Math.min(MAX_BOOST_PER_STAT, (current[stat] ?? 0) + amount)
-          return { boosts: { ...s.boosts, [playerId]: { ...current, [stat]: next } } }
-        }),
-      addTrainingPoints: (playerId, amount) =>
-        set((s) => ({ trainingPoints: { ...s.trainingPoints, [playerId]: (s.trainingPoints[playerId] ?? 0) + amount } })),
-      spendTrainingPoint: (playerId) => {
-        const pts = get().trainingPoints[playerId] ?? 0
-        if (pts <= 0) return false
-        set((s) => ({ trainingPoints: { ...s.trainingPoints, [playerId]: pts - 1 } }))
-        return true
+          const currentBoosts = s.boosts[targetBasePlayer.id] ?? {}
+          const currentXp = s.xp[targetBasePlayer.id] ?? 0
+          const result = applyXpGain(targetBasePlayer, currentBoosts, currentXp, xpGain)
+          return {
+            boosts: { ...s.boosts, [targetBasePlayer.id]: result.boosts },
+            xp: { ...s.xp, [targetBasePlayer.id]: result.xp },
+          }
+        })
+        useCollectionStore.getState().removePlayer(donorId)
       },
+      toggleProtected: (playerId) =>
+        set((s) => ({ protectedIds: { ...s.protectedIds, [playerId]: !s.protectedIds[playerId] } })),
     }),
-    { name: 'af27-upgrades-state' },
+    { name: 'af27-upgrades-state', version: 2 },
   ),
 )

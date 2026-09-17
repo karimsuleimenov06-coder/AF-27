@@ -5,14 +5,35 @@ import { useAppStore, type GraphicsQuality } from '../state/appStore'
 import { useTournamentStore } from '../state/tournamentStore'
 import { ASTRA_CUP_CLUBS } from '../data/tournament'
 import { createMatch, RIVAL_CLUB_NAME } from '../match/setup'
-import { stepMatch, resolvePenalty } from '../match/engine'
+import { stepMatch, getPenaltyParticipants, resolvePenaltyAttempt, applyPenaltyOutcome } from '../match/engine'
+import { pickAiShotAim, pickAiKeeperDive, penaltyBallPosition, aimToWorld, type AimPoint, type PenaltyOutcome, type PenaltyResult } from '../match/penalty'
 import { MatchRenderer3D, QUALITY_TIERS_3D } from '../match/render3d'
-import type { MatchEvent, MatchInput, MatchState } from '../match/types'
+import type { MatchEvent, MatchInput, MatchState, Team } from '../match/types'
 import Joystick from '../components/match/Joystick'
 import { BallIcon } from '../components/Icons'
 import { playCard, playGoal, playConcede, playKick, playTackle, playWhistle, unlockAudio } from '../lib/sound'
 
 type Stage = 'intro' | 'live' | 'result'
+
+type PenaltyRole = 'shooter' | 'keeper'
+type PenaltyStageKind = 'aim' | 'flight' | 'outcome'
+
+interface PenaltyUiState {
+  role: PenaltyRole
+  stage: PenaltyStageKind
+  myAim: AimPoint
+  aiAim: AimPoint
+  countdown: number
+  outcome: PenaltyOutcome | null
+}
+
+const OUTCOME_LABEL: Record<PenaltyOutcome, string> = {
+  goal: 'ГОЛ!',
+  save: 'Вратарь спас!',
+  miss: 'Мимо ворот',
+  post: 'Штанга!',
+  bar: 'Перекладина!',
+}
 
 const QUALITY_INDEX: Record<GraphicsQuality, number> = { low: 0, medium: 1, high: 2, ultra: 3 }
 const HALF_SECONDS = 90
@@ -93,7 +114,20 @@ export default function MatchScreen() {
     lastEvent: null as MatchEvent | null,
     cards: { home: { yellow: 0, red: 0 }, away: { yellow: 0, red: 0 } },
   })
-  const [penalty, setPenalty] = useState<null | 'user' | 'ai'>(null)
+  const [penalty, setPenalty] = useState<PenaltyUiState | null>(null)
+  const penaltyRef = useRef<PenaltyUiState | null>(null)
+  const flightRef = useRef<{
+    startX: number
+    startY: number
+    startedAt: number
+    result: PenaltyResult
+    gkId: string
+    gkStartX: number
+    attackingTeam: Team
+  } | null>(null)
+  useEffect(() => {
+    penaltyRef.current = penalty
+  }, [penalty])
   const [result, setResult] = useState<{ score: { home: number; away: number }; reward: number; gemReward: number } | null>(null)
   const [goalFlash, setGoalFlash] = useState<null | 'home' | 'away'>(null)
 
@@ -105,6 +139,7 @@ export default function MatchScreen() {
     penaltyShownRef.current = false
     lastEventIdRef.current = 0
     prevBallOwnerRef.current = null
+    flightRef.current = null
     setPenalty(null)
     setStage('live')
   }
@@ -148,6 +183,32 @@ export default function MatchScreen() {
       inputRef.current.pass = false
       inputRef.current.shoot = false
 
+      // Penalty flight: while phase stays 'penalty' the engine leaves the
+      // ball alone, so this scripted arc (real gravity-driven trajectory
+      // toward the resolved outcome, plus the keeper diving toward their
+      // chosen point) drives the ball and goalkeeper directly.
+      const flight = flightRef.current
+      if (flight && penaltyRef.current?.stage === 'flight') {
+        const elapsed = (t - flight.startedAt) / 1000
+        const pos = penaltyBallPosition(flight.startX, flight.startY, flight.result.world, flight.result.flightSeconds, elapsed)
+        state.ball.x = pos.x
+        state.ball.y = pos.y
+        state.ball.z = pos.z
+        const gk = state.players.find((p) => p.id === flight.gkId)
+        if (gk) {
+          const diveAim = penaltyRef.current.role === 'shooter' ? penaltyRef.current.aiAim : penaltyRef.current.myAim
+          const diveWorld = aimToWorld(diveAim, flight.attackingTeam)
+          const diveProgress = Math.min(1, elapsed / 0.4)
+          gk.x = flight.gkStartX + (diveWorld.x - flight.gkStartX) * diveProgress
+        }
+        if (elapsed >= flight.result.flightSeconds) {
+          applyPenaltyOutcome(state, flight.result)
+          flightRef.current = null
+          setPenalty((p) => (p ? { ...p, stage: 'outcome' } : p))
+          setTimeout(() => setPenalty(null), 1400)
+        }
+      }
+
       for (const event of state.events) {
         if (event.id <= lastEventIdRef.current) continue
         lastEventIdRef.current = event.id
@@ -185,7 +246,15 @@ export default function MatchScreen() {
       if (state.phase === 'penalty') {
         if (!penaltyShownRef.current) {
           penaltyShownRef.current = true
-          setPenalty(state.restartTeam === 'home' ? 'user' : 'ai')
+          const participants = getPenaltyParticipants(state)
+          const role: PenaltyRole = state.restartTeam === 'home' ? 'shooter' : 'keeper'
+          const aiAim =
+            participants && role === 'keeper'
+              ? pickAiShotAim(participants.taker)
+              : participants
+                ? pickAiKeeperDive(participants.gk, null)
+                : { px: 0, pz: 0.5 }
+          setPenalty({ role, stage: 'aim', myAim: { px: 0, pz: 0.5 }, aiAim, countdown: 5, outcome: null })
         }
       } else {
         penaltyShownRef.current = false
@@ -248,23 +317,52 @@ export default function MatchScreen() {
     }
   }, [stage, addCoins, addGems])
 
-  useEffect(() => {
-    if (penalty !== 'ai') return
-    const timeout = setTimeout(() => {
-      const state = stateRef.current
-      if (!state) return
-      const dirs = ['left', 'center', 'right'] as const
-      resolvePenalty(state, dirs[Math.floor(Math.random() * 3)], 0.7 + Math.random() * 0.3)
-      setPenalty(null)
-    }, 1300)
-    return () => clearTimeout(timeout)
-  }, [penalty])
-
-  const takePenalty = (dir: 'left' | 'center' | 'right') => {
+  const launchPenalty = (current: PenaltyUiState) => {
     const state = stateRef.current
     if (!state) return
-    resolvePenalty(state, dir, 0.85)
-    setPenalty(null)
+    const participants = getPenaltyParticipants(state)
+    if (!participants) {
+      setPenalty(null)
+      return
+    }
+    const shotAim = current.role === 'shooter' ? current.myAim : current.aiAim
+    const diveAim = current.role === 'shooter' ? current.aiAim : current.myAim
+    const result = resolvePenaltyAttempt(state, shotAim, diveAim)
+    if (!result) {
+      setPenalty(null)
+      return
+    }
+    flightRef.current = {
+      startX: participants.taker.x,
+      startY: participants.taker.y,
+      startedAt: performance.now(),
+      result,
+      gkId: participants.gk.id,
+      gkStartX: participants.gk.x,
+      attackingTeam: participants.taker.team,
+    }
+    rendererRef.current?.playAction(participants.gk.id, 'save')
+    setPenalty({ ...current, stage: 'flight', outcome: result.outcome })
+  }
+
+  // 5-second aiming window: the countdown itself ticks down toward zero, and
+  // reaching it auto-fires the shot with whatever point was last tapped (the
+  // starting centre point if the player never tapped at all).
+  useEffect(() => {
+    if (!penalty || penalty.stage !== 'aim') return
+    if (penalty.countdown <= 0) {
+      launchPenalty(penalty)
+      return
+    }
+    const timeout = setTimeout(() => {
+      setPenalty((p) => (p && p.stage === 'aim' ? { ...p, countdown: p.countdown - 1 } : p))
+    }, 1000)
+    return () => clearTimeout(timeout)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [penalty])
+
+  const setAim = (px: number, pz: number) => {
+    setPenalty((p) => (p && p.stage === 'aim' ? { ...p, myAim: { px, pz } } : p))
   }
 
   const phaseLabel: Partial<Record<MatchState['phase'], string>> = {
@@ -464,25 +562,50 @@ export default function MatchScreen() {
             </div>
           </div>
 
-          {penalty === 'user' && (
-            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-black/80 px-8 text-center">
-              <p className="font-display text-lg font-bold text-white">Пенальти! Выберите направление</p>
-              <div className="flex gap-3">
-                {(['left', 'center', 'right'] as const).map((dir) => (
-                  <button
-                    key={dir}
-                    onClick={() => takePenalty(dir)}
-                    className="rounded-xl bg-gradient-to-r from-cyan to-violet px-5 py-3 font-display text-sm font-bold text-night"
+          {penalty && (
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-black/85 px-6 text-center">
+              <p className="font-display text-xs font-semibold tracking-widest text-ink-2 uppercase">
+                {penalty.role === 'shooter' ? 'Пенальти — ваш удар' : 'Пенальти — вы вратарь'}
+              </p>
+
+              {penalty.stage === 'aim' && (
+                <>
+                  <p className="text-sm text-ink">
+                    {penalty.role === 'shooter' ? 'Коснитесь ворот — туда полетит удар' : 'Коснитесь ворот — туда прыгнет вратарь'}
+                  </p>
+                  <div
+                    onPointerDown={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect()
+                      const px = Math.max(-1, Math.min(1, ((e.clientX - rect.left) / rect.width) * 2 - 1))
+                      const pz = Math.max(0, Math.min(1, 1 - (e.clientY - rect.top) / rect.height))
+                      setAim(px, pz)
+                    }}
+                    className="relative aspect-[3/1] w-full max-w-sm touch-none rounded-lg border-4 border-white bg-white/5"
+                    style={{
+                      backgroundImage:
+                        'repeating-linear-gradient(0deg, rgba(255,255,255,0.14) 0 2px, transparent 2px 16px), repeating-linear-gradient(90deg, rgba(255,255,255,0.14) 0 2px, transparent 2px 16px)',
+                    }}
                   >
-                    {dir === 'left' ? 'Влево' : dir === 'center' ? 'Центр' : 'Вправо'}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          {penalty === 'ai' && (
-            <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">
-              <p className="font-display text-lg font-bold text-white">Соперник бьёт пенальти…</p>
+                    <div
+                      className="absolute h-8 w-8 -translate-x-1/2 translate-y-1/2 rounded-full border-2 border-gold bg-gold/40"
+                      style={{ left: `${((penalty.myAim.px + 1) / 2) * 100}%`, bottom: `${penalty.myAim.pz * 100}%` }}
+                    />
+                  </div>
+                  <span className="font-display text-5xl font-black text-gold tabular-nums">
+                    {penalty.countdown > 0 ? penalty.countdown : penalty.role === 'shooter' ? 'УДАР' : 'ПРЫЖОК'}
+                  </span>
+                </>
+              )}
+
+              {penalty.stage === 'flight' && (
+                <p className="font-display text-3xl font-black text-white">{penalty.role === 'shooter' ? 'УДАР!' : 'ПРЫЖОК!'}</p>
+              )}
+
+              {penalty.stage === 'outcome' && penalty.outcome && (
+                <p className={`font-display text-4xl font-black ${penalty.outcome === 'goal' ? 'text-cyan' : 'text-danger'}`}>
+                  {OUTCOME_LABEL[penalty.outcome]}
+                </p>
+              )}
             </div>
           )}
         </div>

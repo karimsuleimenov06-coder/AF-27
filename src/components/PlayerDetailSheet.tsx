@@ -1,18 +1,17 @@
-import type { ReactNode } from 'react'
+import { useState } from 'react'
 import type { Player } from '../types/player'
 import { POSITION_LABEL, RARITY_LABEL } from '../types/player'
 import { RARITY_STYLE } from '../lib/cardStyles'
-import { useAppStore } from '../state/appStore'
-import { useUpgradesStore, UPGRADE_COST_COINS, MAX_BOOST_PER_STAT, type StatBoosts } from '../state/upgradesStore'
+import { xpNeededForLevel } from '../lib/xp'
+import { useUpgradesStore } from '../state/upgradesStore'
+import { useSquadStore } from '../state/squadStore'
 import PlayerCard from './PlayerCard'
-import { CoinIcon } from './Icons'
+import SacrificeSheet from './SacrificeSheet'
 
 interface Props {
   player: Player | null
   onClose: () => void
 }
-
-const EMPTY_BOOSTS: StatBoosts = {}
 
 const STAT_LABELS: [key: keyof Player['stats'], label: string][] = [
   ['pace', 'Скорость'],
@@ -23,7 +22,7 @@ const STAT_LABELS: [key: keyof Player['stats'], label: string][] = [
   ['physical', 'Физика'],
 ]
 
-function StatBar({ label, value, upgrade }: { label: string; value: number; upgrade?: ReactNode }) {
+function StatBar({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex items-center gap-3">
       <span className="w-20 shrink-0 text-xs font-medium text-ink">{label}</span>
@@ -31,25 +30,24 @@ function StatBar({ label, value, upgrade }: { label: string; value: number; upgr
         <div className="h-full rounded-full bg-gradient-to-r from-cyan to-violet" style={{ width: `${value}%` }} />
       </div>
       <span className="w-7 shrink-0 text-right font-display text-sm font-bold text-white tabular-nums">{value}</span>
-      {upgrade}
     </div>
   )
 }
 
 export default function PlayerDetailSheet({ player, onClose }: Props) {
-  const coins = useAppStore((s) => s.profile.coins)
-  const spendCoins = useAppStore((s) => s.spendCoins)
-  const allBoosts = useUpgradesStore((s) => s.boosts)
-  const boostStat = useUpgradesStore((s) => s.boostStat)
+  const xpMap = useUpgradesStore((s) => s.xp)
+  const protectedIds = useUpgradesStore((s) => s.protectedIds)
+  const toggleProtected = useUpgradesStore((s) => s.toggleProtected)
+  const lineup = useSquadStore((s) => s.lineup)
+  const [sacrificeOpen, setSacrificeOpen] = useState(false)
 
   if (!player) return null
   const rarityStyle = RARITY_STYLE[player.rarity]
-  const boosts = allBoosts[player.id] ?? EMPTY_BOOSTS
-
-  const handleUpgrade = (key: keyof Player['stats']) => {
-    if (!spendCoins(UPGRADE_COST_COINS)) return
-    boostStat(player.id, key, 1)
-  }
+  const xp = xpMap[player.id] ?? 0
+  const xpNeeded = xpNeededForLevel(player.rating)
+  const xpPct = player.rating >= 99 ? 100 : Math.min(100, Math.round((xp / xpNeeded) * 100))
+  const isProtected = Boolean(protectedIds[player.id])
+  const isInLineup = Object.values(lineup).includes(player.id)
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center">
@@ -76,34 +74,36 @@ export default function PlayerDetailSheet({ player, onClose }: Props) {
         </div>
 
         <div className="mt-5 flex flex-col gap-2.5 rounded-2xl border border-border bg-surface p-4">
-          {STAT_LABELS.map(([key, label]) => {
-            const boosted = boosts[key] ?? 0
-            const maxed = boosted >= MAX_BOOST_PER_STAT || player.stats[key] >= 99
-            return (
-              <StatBar
-                key={key}
-                label={label}
-                value={player.stats[key]}
-                upgrade={
-                  <button
-                    onClick={() => handleUpgrade(key)}
-                    disabled={maxed || coins < UPGRADE_COST_COINS}
-                    aria-label={`Улучшить ${label}`}
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-cyan/40 bg-cyan/10 text-xs font-bold text-cyan disabled:border-border disabled:bg-surface-2 disabled:text-ink-2"
-                  >
-                    +
-                  </button>
-                }
-              />
-            )
-          })}
+          {STAT_LABELS.map(([key, label]) => (
+            <StatBar key={key} label={label} value={player.stats[key]} />
+          ))}
           <div className="my-1 border-t border-border/60" />
           <StatBar label="Выносливость" value={player.stamina} />
         </div>
 
-        <p className="mt-2 flex items-center justify-center gap-1.5 text-xs text-ink-2">
-          Тренировка: <CoinIcon className="h-3.5 w-3.5 text-gold" /> {UPGRADE_COST_COINS} за +1 к характеристике
-        </p>
+        <div className="mt-3 rounded-2xl border border-cyan/30 bg-cyan/5 p-4">
+          <div className="flex items-center justify-between">
+            <p className="font-display text-xs font-bold tracking-wide text-cyan uppercase">Прокачка</p>
+            <p className="font-display text-xs font-bold text-white tabular-nums">
+              {player.rating >= 99 ? 'Макс.' : `${xp} / ${xpNeeded} XP`}
+            </p>
+          </div>
+          <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-surface-2">
+            <div className="h-full rounded-full bg-gradient-to-r from-cyan to-gold" style={{ width: `${xpPct}%` }} />
+          </div>
+          <p className="mt-1.5 text-[11px] text-ink-2">
+            {player.rating >= 99
+              ? 'Игрок достиг максимального рейтинга.'
+              : `Ещё ${xpNeeded - xp} XP до рейтинга ${player.rating + 1}`}
+          </p>
+          <button
+            onClick={() => setSacrificeOpen(true)}
+            disabled={player.rating >= 99}
+            className="mt-3 w-full rounded-xl bg-gradient-to-r from-cyan to-violet py-2.5 font-display text-sm font-bold text-night disabled:opacity-40"
+          >
+            Сдать игрока за XP
+          </button>
+        </div>
 
         <div className="mt-3 grid grid-cols-2 gap-2.5">
           <div className="rounded-2xl border border-border bg-surface p-3 text-center">
@@ -115,7 +115,21 @@ export default function PlayerDetailSheet({ player, onClose }: Props) {
             <p className="mt-1 font-display text-base font-bold text-gold">{player.value.toLocaleString('ru-RU')}</p>
           </div>
         </div>
+
+        <button
+          onClick={() => toggleProtected(player.id)}
+          className={`mt-2.5 flex w-full items-center justify-center gap-2 rounded-2xl border py-2.5 font-display text-xs font-bold ${
+            isProtected ? 'border-danger/50 bg-danger/10 text-danger' : 'border-border bg-surface text-ink'
+          }`}
+        >
+          {isProtected ? '🔒 Не сдавать — включено' : '🔓 Пометить «Не сдавать»'}
+        </button>
+        {isInLineup && (
+          <p className="mt-2 text-center text-[11px] text-ink-2">Игрок в стартовом составе — его нельзя сдать в жертву.</p>
+        )}
       </div>
+
+      {sacrificeOpen && <SacrificeSheet target={player} onClose={() => setSacrificeOpen(false)} />}
     </div>
   )
 }

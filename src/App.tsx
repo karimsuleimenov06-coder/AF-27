@@ -5,6 +5,7 @@ import MainMenu from './screens/MainMenu'
 import SquadScreen from './screens/SquadScreen'
 import PacksScreen from './screens/PacksScreen'
 import TransfersScreen from './screens/TransfersScreen'
+import UpgradesScreen from './screens/UpgradesScreen'
 import TournamentsScreen from './screens/TournamentsScreen'
 import SettingsScreen from './screens/SettingsScreen'
 
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="squad" element={<SquadScreen />} />
         <Route path="packs" element={<PacksScreen />} />
         <Route path="transfers" element={<TransfersScreen />} />
+        <Route path="upgrades" element={<UpgradesScreen />} />
         <Route path="tournaments" element={<TournamentsScreen />} />
         <Route path="settings" element={<SettingsScreen />} />
         <Route

@@ -1,6 +1,14 @@
 import { PITCH, type Ball, type MatchEvent, type MatchInput, type MatchPlayer, type MatchState, type Team } from './types'
+import { resolvePenaltyShot, type AimPoint, type PenaltyResult } from './penalty'
 
 let eventSeq = 0
+
+// Ball gravity for open-play flight (shots/passes/clearances now carry real
+// height, not just a cosmetic bob) — same constant the penalty flight solve
+// in penalty.ts uses, so a lofted shot and a penalty read as the same physics.
+export const GRAVITY = 20
+const GROUND_BOUNCE_DAMPING = 0.45
+const POST_RADIUS = 0.5
 
 function dist(ax: number, ay: number, bx: number, by: number) {
   return Math.hypot(ax - bx, ay - by)
@@ -90,12 +98,13 @@ function bestPassTarget(state: MatchState, passer: MatchPlayer): MatchPlayer | n
   return best
 }
 
-function setBallVelocityTo(ball: Ball, fromX: number, fromY: number, toX: number, toY: number, speed: number) {
+function setBallVelocityTo(ball: Ball, fromX: number, fromY: number, toX: number, toY: number, speed: number, loft = 0) {
   const dx = toX - fromX
   const dy = toY - fromY
   const len = Math.hypot(dx, dy) || 1
   ball.vx = (dx / len) * speed
   ball.vy = (dy / len) * speed
+  ball.vz = speed * loft
   ball.shotResolved = false
 }
 
@@ -109,7 +118,8 @@ function doPass(state: MatchState, passer: MatchPlayer) {
   const inaccuracy = (1 - passer.passing / 100) * 4.5
   const jitterX = (Math.random() - 0.5) * inaccuracy
   const jitterY = (Math.random() - 0.5) * inaccuracy
-  setBallVelocityTo(state.ball, passer.x, passer.y, aim.x + jitterX, aim.y + jitterY, 32 + passer.passing * 0.22)
+  const loft = 0.04 + Math.random() * 0.05
+  setBallVelocityTo(state.ball, passer.x, passer.y, aim.x + jitterX, aim.y + jitterY, 32 + passer.passing * 0.22, loft)
   state.ball.ownerId = null
   state.ball.lastTouchTeam = passer.team
 }
@@ -119,7 +129,10 @@ function doShoot(state: MatchState, shooter: MatchPlayer) {
   const spread = (1 - shooter.shooting / 100) * 11
   const targetX = PITCH.width / 2 + (Math.random() - 0.5) * spread
   const power = 34 + shooter.shooting * 0.3
-  setBallVelocityTo(state.ball, shooter.x, shooter.y, targetX, goalY, power)
+  // Better finishers keep the ball down and precise; wilder shooters loft it
+  // more — which is also what lets a shot balloon over the bar realistically.
+  const loft = clamp(0.09 + (1 - shooter.shooting / 100) * 0.22 + (Math.random() - 0.5) * 0.14, 0.02, 0.55)
+  setBallVelocityTo(state.ball, shooter.x, shooter.y, targetX, goalY, power, loft)
   state.ball.ownerId = null
   state.ball.lastTouchTeam = shooter.team
 }
@@ -132,6 +145,8 @@ function startRestart(state: MatchState, phase: MatchState['phase'], team: Team,
   state.ball.ownerId = null
   state.ball.vx = 0
   state.ball.vy = 0
+  state.ball.vz = 0
+  state.ball.z = 0
   state.ball.x = state.restartSpot.x
   state.ball.y = state.restartSpot.y
   if (log) pushEvent(state, phase === 'corner' ? 'corner' : phase === 'penalty' ? 'penalty' : 'whistle', team, log)
@@ -144,7 +159,7 @@ function resolveOutOfPlay(state: MatchState) {
 
   if (b.y <= 0 || b.y >= PITCH.length) {
     const atHomeEnd = b.y <= 0
-    const inGoal = b.x >= goalLeft && b.x <= goalRight
+    const inGoal = b.x >= goalLeft && b.x <= goalRight && b.z <= PITCH.goalHeight
     const defendingTeam: Team = atHomeEnd ? 'home' : 'away'
     const attackingTeam: Team = atHomeEnd ? 'away' : 'home'
 
@@ -170,6 +185,39 @@ function resolveOutOfPlay(state: MatchState) {
     const throwTeam: Team = b.lastTouchTeam === 'home' ? 'away' : 'home'
     startRestart(state, 'throwin', throwTeam, clamp(b.x, 3, PITCH.width - 3), b.y, 'Аут')
   }
+}
+
+/** A shot that's about to cross the goal line right at the edge of the
+ * frame — the post or the bar — deflects back into play instead of
+ * scoring or sailing dead, same as a real woodwork shot. Real physics (the
+ * ball's own x/y/z at the moment it reaches the line), not a scripted
+ * outcome, decides whether this triggers. Returns true if it handled the
+ * frame this frame, in which case resolveOutOfPlay should be skipped. */
+function checkGoalFrameCollision(state: MatchState): boolean {
+  const b = state.ball
+  const nearHomeLine = b.y <= 1.2
+  const nearAwayLine = b.y >= PITCH.length - 1.2
+  if (!nearHomeLine && !nearAwayLine) return false
+
+  const goalLeft = PITCH.width / 2 - PITCH.goalWidth / 2
+  const goalRight = PITCH.width / 2 + PITCH.goalWidth / 2
+  const inMouthX = b.x > goalLeft - POST_RADIUS && b.x < goalRight + POST_RADIUS
+  const nearPost = inMouthX && (Math.abs(b.x - goalLeft) < POST_RADIUS || Math.abs(b.x - goalRight) < POST_RADIUS)
+  const nearBar = inMouthX && b.z > PITCH.goalHeight - POST_RADIUS && b.z < PITCH.goalHeight + POST_RADIUS
+
+  const hitPost = nearPost && b.z < PITCH.goalHeight
+  const hitBar = nearBar && !hitPost
+
+  if (!hitPost && !hitBar) return false
+
+  const team: Team = nearHomeLine ? 'home' : 'away'
+  pushEvent(state, 'whistle', team, hitPost ? 'Штанга!' : 'Перекладина!')
+  b.vy = -b.vy * 0.5
+  if (hitPost) b.vx = -b.vx * 0.6
+  if (hitBar) b.vz = -Math.abs(b.vz) * 0.5
+  b.y = nearHomeLine ? 1.3 : PITCH.length - 1.3
+  b.shotResolved = true
+  return true
 }
 
 // --- Tackling & fouls --------------------------------------------------
@@ -209,6 +257,8 @@ function attemptTackle(state: MatchState, tackler: MatchPlayer, carrier: MatchPl
     state.ball.ownerId = tackler.id
     state.ball.vx = 0
     state.ball.vy = 0
+    state.ball.vz = 0
+    state.ball.z = 0
     state.ball.shotResolved = true
     return
   }
@@ -267,12 +317,12 @@ function attemptTackle(state: MatchState, tackler: MatchPlayer, carrier: MatchPl
 function goalkeeperDistribute(state: MatchState, gk: MatchPlayer) {
   const target = bestPassTarget(state, gk)
   if (target) {
-    setBallVelocityTo(state.ball, gk.x, gk.y, target.x, target.y, 24 + gk.passing * 0.14)
+    setBallVelocityTo(state.ball, gk.x, gk.y, target.x, target.y, 24 + gk.passing * 0.14, 0.07)
   } else {
     // No easy short option — clear it long into space upfield.
     const aimY = gk.team === 'home' ? PITCH.length * 0.6 : PITCH.length * 0.4
     const aimX = PITCH.width / 2 + (Math.random() - 0.5) * 40
-    setBallVelocityTo(state.ball, gk.x, gk.y, aimX, aimY, 34)
+    setBallVelocityTo(state.ball, gk.x, gk.y, aimX, aimY, 34, 0.22)
   }
   state.ball.ownerId = null
   state.ball.lastTouchTeam = gk.team
@@ -315,9 +365,13 @@ function updateGoalkeeper(state: MatchState, gk: MatchPlayer, dt: number, now: n
   if (tToLine <= 0 || tToLine > 2.4) return
 
   const predictedX = b.x + b.vx * tToLine
+  const predictedZ = b.z + b.vz * tToLine - 0.5 * GRAVITY * tToLine * tToLine
   const onTarget = predictedX > goalLeft - 1.5 && predictedX < goalRight + 1.5
   if (!onTarget) {
-    return // heading wide or over — nothing for the keeper to do
+    return // heading wide — nothing for the keeper to do
+  }
+  if (predictedZ > PITCH.goalHeight + 0.35) {
+    return // ballooning over the bar — not even a save opportunity
   }
 
   const distToPredicted = Math.abs(gk.x - predictedX)
@@ -345,15 +399,18 @@ function updateGoalkeeper(state: MatchState, gk: MatchPlayer, dt: number, now: n
     b.ownerId = gk.id
     b.vx = 0
     b.vy = 0
+    b.vz = 0
+    b.z = 0
     gk.nextDecisionAt = now + 0.9 + Math.random() * 0.5
   } else {
     // Stretch save / parry: can't hold it, knocked away instead — a loose
-    // ball or scramble rather than a clean take.
+    // ball or scramble rather than a clean take. Parries tend to pop up.
     const deflectAngle = Math.random() * Math.PI * 2
     b.x = gk.x
     b.y = gk.y
     b.vx = Math.cos(deflectAngle) * 6
     b.vy = Math.sin(deflectAngle) * 6 + (gk.team === 'home' ? 3 : -3)
+    b.vz = 3 + Math.random() * 3
   }
 }
 
@@ -531,6 +588,8 @@ export function stepMatch(state: MatchState, dt: number, input: MatchInput, now:
       b.y = owner.y + aheadY * 1.4
       b.vx = 0
       b.vy = 0
+      b.vz = 0
+      b.z = 0
     } else {
       b.ownerId = null
     }
@@ -540,13 +599,26 @@ export function stepMatch(state: MatchState, dt: number, input: MatchInput, now:
     b.x += b.vx * dt
     b.y += b.vy * dt
 
+    // Real vertical flight: gravity pulls a lofted shot/pass/clearance back
+    // down, and it bounces (losing energy) rather than skimming the ground
+    // forever — this is what lets a shot actually clear the bar or thump
+    // off the woodwork instead of always arriving at goal-mouth height.
+    b.vz -= GRAVITY * dt
+    b.z += b.vz * dt
+    if (b.z <= 0) {
+      b.z = 0
+      b.vz = Math.abs(b.vz) > 1.5 ? -b.vz * GROUND_BOUNCE_DAMPING : 0
+    }
+
     if (b.x <= 0.5 || b.x >= PITCH.width - 0.5) {
       resolveOutOfPlay(state)
       return state
     }
     if (b.y <= 0.5 || b.y >= PITCH.length - 0.5) {
-      resolveOutOfPlay(state)
-      return state
+      if (!checkGoalFrameCollision(state)) {
+        resolveOutOfPlay(state)
+        return state
+      }
     }
 
     let nearest: MatchPlayer | null = null
@@ -621,27 +693,55 @@ function resumePlayFromRestart(state: MatchState, now: number) {
   state.restartSpot = null
 }
 
-export function resolvePenalty(state: MatchState, direction: 'left' | 'center' | 'right', power: number) {
+/** Finds the shooter/keeper pair for the penalty currently awarded — used
+ * by MatchScreen to drive the tap-to-aim UI and by applyPenaltyOutcome to
+ * resolve it. */
+export function getPenaltyParticipants(state: MatchState): { taker: MatchPlayer; gk: MatchPlayer } | null {
   const taker = state.players.find((p) => p.team === state.restartTeam && !p.isGK)
   const gk = state.players.find((p) => p.team !== state.restartTeam && p.isGK)
-  if (!taker || !gk) {
-    state.phase = 'play'
+  if (!taker || !gk) return null
+  return { taker, gk }
+}
+
+export function resolvePenaltyAttempt(state: MatchState, aim: AimPoint, keeperDive: AimPoint): PenaltyResult | null {
+  const participants = getPenaltyParticipants(state)
+  if (!participants) return null
+  return resolvePenaltyShot(participants.taker, participants.gk, aim, keeperDive)
+}
+
+/** Applies a resolved penalty attempt to match state: scores the goal, or
+ * hands the defending side a goal kick, and (re)starts play accordingly.
+ * The actual ball-flight animation is driven separately by MatchScreen —
+ * this just settles the outcome once the flight finishes. */
+export function applyPenaltyOutcome(state: MatchState, result: PenaltyResult) {
+  const shootingTeam = state.restartTeam!
+  const defendingTeam: Team = shootingTeam === 'home' ? 'away' : 'home'
+  const b = state.ball
+  b.x = result.world.x
+  b.y = result.world.y
+  b.z = result.world.z
+  b.vx = 0
+  b.vy = 0
+  b.vz = 0
+  b.ownerId = null
+  b.lastTouchTeam = shootingTeam
+
+  if (result.outcome === 'goal') {
+    state.score[shootingTeam] += 1
+    state.phase = 'goal'
+    state.phaseTimer = 2.4
+    pushEvent(state, 'goal', shootingTeam, 'Пенальти реализован!')
     return
   }
-  const dirX = direction === 'left' ? PITCH.width / 2 - 7 : direction === 'right' ? PITCH.width / 2 + 7 : PITCH.width / 2
-  const gkGuess = Math.random() < 0.55 ? direction : (['left', 'center', 'right'] as const)[Math.floor(Math.random() * 3)]
-  const saved = gkGuess === direction && Math.random() < 0.4 + gk.defending / 300
 
-  const scoringTeam = state.restartTeam!
-  if (!saved && power > 0.3) {
-    state.score[scoringTeam] += 1
-    pushEvent(state, 'goal', scoringTeam, 'Пенальти реализован!')
-  } else {
-    pushEvent(state, 'whistle', scoringTeam, saved ? 'Вратарь отразил пенальти!' : 'Мимо ворот!')
+  const label: Record<Exclude<PenaltyResult['outcome'], 'goal'>, string> = {
+    save: 'Вратарь отразил пенальти!',
+    miss: 'Мимо ворот!',
+    post: 'Штанга!',
+    bar: 'Перекладина!',
   }
-  void dirX
-  state.phase = 'goal'
-  state.phaseTimer = 2
+  pushEvent(state, 'whistle', shootingTeam, label[result.outcome])
+  startRestart(state, 'goalkick', defendingTeam, PITCH.width / 2, shootingTeam === 'home' ? PITCH.length - 6 : 6)
 }
 
 function resetForKickoff(state: MatchState) {
@@ -654,8 +754,10 @@ function resetForKickoff(state: MatchState) {
   }
   state.ball.x = PITCH.width / 2
   state.ball.y = PITCH.length / 2
+  state.ball.z = 0
   state.ball.vx = 0
   state.ball.vy = 0
+  state.ball.vz = 0
   state.ball.shotResolved = true
   const starter = state.players.find((p) => p.team === kickoffTeam && !p.isGK)
   if (starter) {

@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../state/appStore'
 import MenuTile from '../components/MenuTile'
-import { BallIcon, PackIcon, SettingsIcon, SquadIcon, TransferIcon, TrophyIcon } from '../components/Icons'
+import { BallIcon, PackIcon, SettingsIcon, SquadIcon, TransferIcon, TrophyIcon, UpgradeIcon } from '../components/Icons'
 
 export default function MainMenu() {
   const navigate = useNavigate()
@@ -44,6 +44,7 @@ export default function MainMenu() {
           <MenuTile to="/squad" title="Состав" subtitle="Игроки, позиции, схема" Icon={SquadIcon} accent="from-cyan to-emerald" />
           <MenuTile to="/packs" title="Паки" subtitle="Откройте новых игроков" Icon={PackIcon} accent="from-gold to-gold-2" />
           <MenuTile to="/transfers" title="Трансферы" subtitle="Рынок и сделки" Icon={TransferIcon} accent="from-violet to-cyan" />
+          <MenuTile to="/upgrades" title="Улучшение" subtitle="XP и сдача игроков" Icon={UpgradeIcon} accent="from-gold to-danger" />
           <MenuTile to="/tournaments" title="Турниры" subtitle="Соревнования и лиги" Icon={TrophyIcon} accent="from-emerald to-cyan" />
           <MenuTile to="/settings" title="Настройки" subtitle="Графика, звук, FPS" Icon={SettingsIcon} accent="from-ink-2 to-surface-2" />
         </div>

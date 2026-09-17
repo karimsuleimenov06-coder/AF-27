@@ -108,7 +108,7 @@ export function createMatch(formationId: FormationId, lineup: Lineup, halfDurati
 
   return {
     players,
-    ball: { x: PITCH.width / 2, y: PITCH.length / 2, vx: 0, vy: 0, ownerId: null, lastTouchTeam: null, shotResolved: true },
+    ball: { x: PITCH.width / 2, y: PITCH.length / 2, z: 0, vx: 0, vy: 0, vz: 0, ownerId: null, lastTouchTeam: null, shotResolved: true },
     half: 1,
     clock: 0,
     halfDuration: halfDurationSeconds,

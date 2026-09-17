@@ -105,6 +105,16 @@ export function BallIcon(props: IconProps) {
   )
 }
 
+export function UpgradeIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M12 20V6" />
+      <path d="m6 11 6-6 6 6" />
+      <path d="M6 20h12" />
+    </svg>
+  )
+}
+
 export function ChevronRightIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>

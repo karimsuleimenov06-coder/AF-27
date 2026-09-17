@@ -518,9 +518,7 @@ export class MatchRenderer3D {
     }
 
     const bw = toWorld(state.ball.x, state.ball.y)
-    const speed = Math.hypot(state.ball.vx, state.ball.vy)
-    const bob = state.ball.ownerId ? 0.6 : 0.6 + Math.min(1.2, speed / 60) * Math.abs(Math.sin(performance.now() / 90))
-    this.ballMesh.position.set(bw.x, bob, bw.z)
+    this.ballMesh.position.set(bw.x, 0.6 + state.ball.z, bw.z)
 
     const targetX = THREE.MathUtils.clamp(bw.x * 0.35, -14, 14)
     this.camTarget.x = THREE.MathUtils.lerp(this.camTarget.x, targetX, 0.05)

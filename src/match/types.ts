@@ -2,6 +2,7 @@ export const PITCH = {
   width: 100,
   length: 155,
   goalWidth: 20,
+  goalHeight: 2.44,
   boxWidth: 60,
   boxDepth: 22,
   sixWidth: 30,
@@ -50,8 +51,11 @@ export interface MatchPlayer {
 export interface Ball {
   x: number
   y: number
+  /** Height off the ground. 0 = resting/rolling on the turf. */
+  z: number
   vx: number
   vy: number
+  vz: number
   ownerId: string | null
   lastTouchTeam: Team | null
   /** Guards the goalkeeper save check so a single shot is only judged once,
