@@ -9,6 +9,11 @@ let eventSeq = 0
 export const GRAVITY = 20
 const GROUND_BOUNCE_DAMPING = 0.45
 const POST_RADIUS = 0.5
+// A kicked ball must clear this much distance from where it was struck
+// before its own kicker is eligible to receive it again (see the pickup
+// loop in stepMatch) — otherwise a stationary player (a goalkeeper
+// distributing is the clearest case) instantly re-catches their own kick.
+const MIN_KICK_CLEAR_DIST = 3
 
 function dist(ax: number, ay: number, bx: number, by: number) {
   return Math.hypot(ax - bx, ay - by)
@@ -98,7 +103,7 @@ function bestPassTarget(state: MatchState, passer: MatchPlayer): MatchPlayer | n
   return best
 }
 
-function setBallVelocityTo(ball: Ball, fromX: number, fromY: number, toX: number, toY: number, speed: number, loft = 0) {
+function setBallVelocityTo(ball: Ball, fromX: number, fromY: number, toX: number, toY: number, speed: number, loft: number, kickerId: string) {
   const dx = toX - fromX
   const dy = toY - fromY
   const len = Math.hypot(dx, dy) || 1
@@ -106,6 +111,9 @@ function setBallVelocityTo(ball: Ball, fromX: number, fromY: number, toX: number
   ball.vy = (dy / len) * speed
   ball.vz = speed * loft
   ball.shotResolved = false
+  ball.kickerId = kickerId
+  ball.kickOriginX = fromX
+  ball.kickOriginY = fromY
 }
 
 function opponentGoalX() {
@@ -119,7 +127,12 @@ function doPass(state: MatchState, passer: MatchPlayer) {
   const jitterX = (Math.random() - 0.5) * inaccuracy
   const jitterY = (Math.random() - 0.5) * inaccuracy
   const loft = 0.04 + Math.random() * 0.05
-  setBallVelocityTo(state.ball, passer.x, passer.y, aim.x + jitterX, aim.y + jitterY, 32 + passer.passing * 0.22, loft)
+  // Power scales with distance — a five-yard ball and a cross-field switch
+  // shouldn't leave the boot at the same speed. Short passes stay soft and
+  // accurate-feeling; long ones get real pace so they actually arrive.
+  const passDist = dist(passer.x, passer.y, aim.x, aim.y)
+  const power = clamp(20 + passDist * 0.42 + passer.passing * 0.14, 22, 58)
+  setBallVelocityTo(state.ball, passer.x, passer.y, aim.x + jitterX, aim.y + jitterY, power, loft, passer.id)
   state.ball.ownerId = null
   state.ball.lastTouchTeam = passer.team
 }
@@ -132,7 +145,7 @@ function doShoot(state: MatchState, shooter: MatchPlayer) {
   // Better finishers keep the ball down and precise; wilder shooters loft it
   // more — which is also what lets a shot balloon over the bar realistically.
   const loft = clamp(0.09 + (1 - shooter.shooting / 100) * 0.22 + (Math.random() - 0.5) * 0.14, 0.02, 0.55)
-  setBallVelocityTo(state.ball, shooter.x, shooter.y, targetX, goalY, power, loft)
+  setBallVelocityTo(state.ball, shooter.x, shooter.y, targetX, goalY, power, loft, shooter.id)
   state.ball.ownerId = null
   state.ball.lastTouchTeam = shooter.team
 }
@@ -314,28 +327,127 @@ function attemptTackle(state: MatchState, tackler: MatchPlayer, carrier: MatchPl
 // re-rolling every frame the ball happens to be "close", which is what made
 // fast shots feel like a coin flip before (a shot could cross the whole save
 // window between two frames and never get evaluated at a sane distance).
-function goalkeeperDistribute(state: MatchState, gk: MatchPlayer) {
-  const target = bestPassTarget(state, gk)
+//
+// Possession itself runs through an explicit state machine (GkState) so a
+// keeper who's just caught the ball has one clear job — decide, act, get
+// back — instead of drifting under logic that was really written for
+// "where do I stand when I don't have the ball".
+const GK_DECISION_MIN = 2 // seconds — never resolves instantly
+const GK_DECISION_MAX = 4 // seconds — never stalls either
+const GK_DANGER_RADIUS = 11 // an opponent this close forces a clearance over a risky short pass
+const GK_PASS_MIN_GAP = 6 // a teammate needs at least this much space to count as "safe"
+
+function isSafeGkPassOption(state: MatchState, gk: MatchPlayer, t: MatchPlayer) {
+  const d = dist(gk.x, gk.y, t.x, t.y)
+  if (d < 4 || d > 56) return false
+  return nearestOpponentDist(state, t) >= GK_PASS_MIN_GAP
+}
+
+/** Priority: an unmarked defender first (building out from the back is the
+ * lowest-risk option), then an unmarked midfielder, then any other safe
+ * teammate. The opposing side is never even in this list — `state.players`
+ * is filtered to `gk.team` up front. */
+function chooseGkPassTarget(state: MatchState, gk: MatchPlayer): MatchPlayer | null {
+  const teammates = state.players.filter((t) => t.team === gk.team && t.id !== gk.id && !t.isGK && !t.sentOff)
+  const nearestSafeInGroup = (group: 'DEF' | 'MID') =>
+    teammates
+      .filter((t) => t.positionGroup === group && isSafeGkPassOption(state, gk, t))
+      .sort((a, b) => dist(gk.x, gk.y, a.x, a.y) - dist(gk.x, gk.y, b.x, b.y))[0] ?? null
+
+  return (
+    nearestSafeInGroup('DEF') ??
+    nearestSafeInGroup('MID') ??
+    teammates.filter((t) => isSafeGkPassOption(state, gk, t)).sort((a, b) => dist(gk.x, gk.y, a.x, a.y) - dist(gk.x, gk.y, b.x, b.y))[0] ??
+    null
+  )
+}
+
+/** The single place a goalkeeper's possession timer is ever set — called
+ * from every code path that can hand a keeper the ball (a save, the
+ * generic loose-ball pickup, a restart) so gkState and nextDecisionAt
+ * always change together atomically. Two separate call sites racing to
+ * set nextDecisionAt with different formulas (one of them a stale,
+ * much-shorter legacy value) was the actual cause of a keeper sometimes
+ * releasing the ball earlier than its 2-4s decision window.
+ *
+ * The deadline itself is only ever rolled fresh if there wasn't already
+ * one still pending. A defender standing right next to the keeper can
+ * repeatedly pop the ball loose in a failed tackle and have it resettle
+ * at the keeper's feet a fraction of a second later — each of those
+ * micro-reclaims calls this function again, and re-rolling a brand new
+ * 2-4s window every single time let sustained pressure chain those resets
+ * indefinitely, which is exactly what made the keeper appear to hang onto
+ * the ball forever. Keeping the original deadline means the decision
+ * timer is bounded no matter how many times possession flickers within
+ * the same contested moment. */
+function gkGainsPossession(gk: MatchPlayer, now: number) {
+  gk.gkState = 'hasBall'
+  if (now >= gk.nextDecisionAt) {
+    gk.nextDecisionAt = now + GK_DECISION_MIN + Math.random() * (GK_DECISION_MAX - GK_DECISION_MIN)
+  }
+}
+
+/** Called once the HasBall decision timer elapses: pass to the safest
+ * available teammate, or clear it long into space if opponents are right
+ * on top of the keeper or nobody's safely reachable. Either way this is
+ * real ball physics (setBallVelocityTo), never a position snap. */
+function goalkeeperAct(state: MatchState, gk: MatchPlayer) {
+  const underPressure = nearestOpponentDist(state, gk) < GK_DANGER_RADIUS
+  const target = underPressure ? null : chooseGkPassTarget(state, gk)
+
   if (target) {
-    setBallVelocityTo(state.ball, gk.x, gk.y, target.x, target.y, 24 + gk.passing * 0.14, 0.07)
+    gk.gkState = 'passing'
+    setBallVelocityTo(state.ball, gk.x, gk.y, target.x, target.y, 26 + gk.passing * 0.16, 0.05, gk.id)
   } else {
-    // No easy short option — clear it long into space upfield.
-    const aimY = gk.team === 'home' ? PITCH.length * 0.6 : PITCH.length * 0.4
-    const aimX = PITCH.width / 2 + (Math.random() - 0.5) * 40
-    setBallVelocityTo(state.ball, gk.x, gk.y, aimX, aimY, 34, 0.22)
+    gk.gkState = 'clearing'
+    const aimY = gk.team === 'home' ? PITCH.length * (0.5 + Math.random() * 0.25) : PITCH.length * (0.5 - Math.random() * 0.25)
+    const aimX = clamp(PITCH.width / 2 + (Math.random() - 0.5) * 46, 6, PITCH.width - 6)
+    setBallVelocityTo(state.ball, gk.x, gk.y, aimX, aimY, 38 + gk.passing * 0.06, 0.26, gk.id)
   }
   state.ball.ownerId = null
   state.ball.lastTouchTeam = gk.team
+  gk.gkState = 'returning'
 }
 
 function updateGoalkeeper(state: MatchState, gk: MatchPlayer, dt: number, now: number) {
+  const b = state.ball
+
+  // HasBall: stop moving and decide, on a bounded timer — this is the fix
+  // for "the keeper just wanders after catching it": the old code kept
+  // running full defensive-positioning movement every frame even while
+  // holding the ball (whose position was itself glued to the keeper), so
+  // the target the keeper chased fed back on itself instead of ever being
+  // a place to stand still and think.
+  if (b.ownerId === gk.id) {
+    if (gk.gkState !== 'hasBall') gkGainsPossession(gk, now)
+    steerTo(gk, 0, 0, dt, BRAKE_ACCEL)
+    if (now >= gk.nextDecisionAt) goalkeeperAct(state, gk)
+    return
+  }
+
+  if (gk.gkState === 'hasBall' || gk.gkState === 'passing' || gk.gkState === 'clearing') gk.gkState = 'returning'
+
   const own = ownGoalY(gk.team)
   const goalLeft = PITCH.width / 2 - PITCH.goalWidth / 2
   const goalRight = PITCH.width / 2 + PITCH.goalWidth / 2
-  const b = state.ball
-
-  const targetX = clamp(b.x, goalLeft + 1, goalRight - 1)
   const distToOwnGoal = Math.abs(b.y - own)
+  const ballSpeed = Math.hypot(b.vx, b.vy)
+
+  // MovingToBall: a loose ball resting or trickling around the box is
+  // actively claimed instead of only ever being shadowed from the goal
+  // line — previously nothing but incidental proximity ever brought the
+  // keeper to it.
+  const inBox = distToOwnGoal < PITCH.boxDepth + 4 && Math.abs(b.x - PITCH.width / 2) < PITCH.boxWidth / 2 + 4
+  const claimable = !b.ownerId && inBox && (b.shotResolved || ballSpeed < 9)
+  if (claimable) {
+    gk.gkState = 'movingToBall'
+    moveToward(gk, b.x, b.y, dt, true)
+    return
+  }
+  if (gk.gkState === 'movingToBall') gk.gkState = 'normal'
+
+  // Normal / returning: defensive shadow positioning.
+  const targetX = clamp(b.x, goalLeft + 1, goalRight - 1)
   const advance = distToOwnGoal < 32 ? clamp((32 - distToOwnGoal) / 32, 0, 1) * 6.5 : 0
   const targetY = own + (gk.team === 'home' ? 2.5 + advance : -2.5 - advance)
   const urgent = distToOwnGoal < 22
@@ -346,19 +458,22 @@ function updateGoalkeeper(state: MatchState, gk: MatchPlayer, dt: number, now: n
   const desiredVx = toTargetD < 0.4 ? 0 : (toTargetX / toTargetD) * gkSpeed
   const desiredVy = toTargetD < 0.4 ? 0 : (toTargetY / toTargetD) * gkSpeed
   steerTo(gk, desiredVx, desiredVy, dt, urgent ? DIVE_ACCEL : BASE_ACCEL)
-
-  // A keeper who has the ball must eventually let go of it — without this a
-  // caught shot or a loose ball gathered near the box would stick to them
-  // forever and the match would just stall.
-  if (b.ownerId === gk.id) {
-    if (now >= gk.nextDecisionAt) goalkeeperDistribute(state, gk)
-    return
-  }
+  if (gk.gkState === 'returning' && toTargetD < 1) gk.gkState = 'normal'
 
   if (b.ownerId || b.shotResolved) return
 
+  // A teammate's pass or backpass must never be treated as an incoming
+  // shot to save — only react to the ball if the LAST TOUCH was the
+  // opposing side. This was the actual cause of the "pass teleports to the
+  // keeper" bug: without this check, any fast ball heading toward this
+  // goal — including a routine pass from this keeper's own defender — ran
+  // through the same predicted-save roll as a real shot, and a successful
+  // "catch" snapped possession (and therefore the ball's on-screen
+  // position, which follows its owner) to the keeper well before the pass
+  // had actually travelled there.
+  if (b.lastTouchTeam === gk.team) return
+
   const headingTowardThisGoal = gk.team === 'home' ? b.vy < 0 : b.vy > 0
-  const ballSpeed = Math.hypot(b.vx, b.vy)
   if (!headingTowardThisGoal || ballSpeed < 9) return
 
   const tToLine = b.vy !== 0 ? (own - b.y) / b.vy : Infinity
@@ -395,13 +510,12 @@ function updateGoalkeeper(state: MatchState, gk: MatchPlayer, dt: number, now: n
   }
 
   if (marginFactor > 0.55 && ballSpeed < 46) {
-    // Comfortable save — caught and held.
+    // Comfortable save — caught and held. HasBall picks up next frame.
     b.ownerId = gk.id
     b.vx = 0
     b.vy = 0
     b.vz = 0
     b.z = 0
-    gk.nextDecisionAt = now + 0.9 + Math.random() * 0.5
   } else {
     // Stretch save / parry: can't hold it, knocked away instead — a loose
     // ball or scramble rather than a clean take. Parries tend to pop up.
@@ -621,10 +735,18 @@ export function stepMatch(state: MatchState, dt: number, input: MatchInput, now:
       }
     }
 
+    // A kick only carries the ball a fraction of a unit in a single 20ms
+    // frame — well inside the pickup radius below — so without this, the
+    // player who just kicked it (a stationary goalkeeper distributing is
+    // the clearest case) would instantly reclaim their own pass or
+    // clearance before it had gone anywhere, over and over.
+    const kickerStillClearing = b.kickerId !== null && dist(b.x, b.y, b.kickOriginX, b.kickOriginY) < MIN_KICK_CLEAR_DIST
+
     let nearest: MatchPlayer | null = null
     let nearestD = 999
     for (const p of state.players) {
       if (p.sentOff) continue
+      if (kickerStillClearing && p.id === b.kickerId) continue
       const d = dist(p.x, p.y, b.x, b.y)
       if (d < nearestD) {
         nearestD = d
@@ -636,7 +758,12 @@ export function stepMatch(state: MatchState, dt: number, input: MatchInput, now:
       b.lastTouchTeam = nearest.team
       b.shotResolved = true
       if (nearest.isGK) {
-        nearest.nextDecisionAt = now + 0.7 + Math.random() * 0.4
+        // Set atomically with gkState so there's never a frame where the
+        // keeper owns the ball but its state machine hasn't caught up yet
+        // (see gkGainsPossession) — matters here specifically because a
+        // keeper can regain a loose ball this same way moments after losing
+        // it to a challenge, mid-hold.
+        gkGainsPossession(nearest, now)
       } else if (nearest.team === 'home') {
         state.userControlledId = nearest.id
       }
@@ -683,7 +810,7 @@ function resumePlayFromRestart(state: MatchState, now: number) {
       state.ball.ownerId = closest.id
       state.ball.shotResolved = true
       if (closest.isGK) {
-        closest.nextDecisionAt = now + 0.4 + Math.random() * 0.3
+        gkGainsPossession(closest, now)
       } else if (closest.team === 'home') {
         state.userControlledId = closest.id
       }

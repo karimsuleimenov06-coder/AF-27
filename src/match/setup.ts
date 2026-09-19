@@ -52,6 +52,7 @@ function buildTeam(team: 'home' | 'away', formationId: FormationId, lineup: Line
           id: data.id,
           team,
           isGK: data.position === 'GK',
+          positionGroup: slot.group,
           number: i + 1,
           name: data.name,
           rating: data.rating,
@@ -71,6 +72,7 @@ function buildTeam(team: 'home' | 'away', formationId: FormationId, lineup: Line
           yellow: 0,
           sentOff: false,
           nextDecisionAt: 0,
+          gkState: 'normal',
         }
       }
     }
@@ -81,6 +83,7 @@ function buildTeam(team: 'home' | 'away', formationId: FormationId, lineup: Line
       id: `away-${slot.id}`,
       team,
       isGK: slot.group === 'GK',
+      positionGroup: slot.group,
       number: i + 1,
       name: RIVAL_NAMES[i % RIVAL_NAMES.length],
       rating,
@@ -95,6 +98,7 @@ function buildTeam(team: 'home' | 'away', formationId: FormationId, lineup: Line
       yellow: 0,
       sentOff: false,
       nextDecisionAt: 0,
+      gkState: 'normal',
     }
   })
 }
@@ -108,7 +112,20 @@ export function createMatch(formationId: FormationId, lineup: Lineup, halfDurati
 
   return {
     players,
-    ball: { x: PITCH.width / 2, y: PITCH.length / 2, z: 0, vx: 0, vy: 0, vz: 0, ownerId: null, lastTouchTeam: null, shotResolved: true },
+    ball: {
+      x: PITCH.width / 2,
+      y: PITCH.length / 2,
+      z: 0,
+      vx: 0,
+      vy: 0,
+      vz: 0,
+      ownerId: null,
+      lastTouchTeam: null,
+      shotResolved: true,
+      kickerId: null,
+      kickOriginX: PITCH.width / 2,
+      kickOriginY: PITCH.length / 2,
+    },
     half: 1,
     clock: 0,
     halfDuration: halfDurationSeconds,

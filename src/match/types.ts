@@ -11,6 +11,17 @@ export const PITCH = {
 
 export type Team = 'home' | 'away'
 
+export type PositionGroup = 'GK' | 'DEF' | 'MID' | 'ATT'
+
+/** Goalkeeper decision states (see engine.ts's updateGoalkeeper): most of
+ * the time a keeper is 'normal' (defensive shadow positioning) or
+ * 'movingToBall' (actively claiming a loose ball in their box). Gaining
+ * possession moves them to 'hasBall', which freezes movement and starts a
+ * bounded decision timer; 'passing'/'clearing' are the one-tick actions
+ * that timer resolves into, after which they're 'returning' (racing back
+ * toward goal) before settling back to 'normal'. */
+export type GkState = 'normal' | 'movingToBall' | 'hasBall' | 'passing' | 'clearing' | 'returning'
+
 export type MatchPhase =
   | 'kickoff'
   | 'play'
@@ -27,6 +38,7 @@ export interface MatchPlayer {
   id: string
   team: Team
   isGK: boolean
+  positionGroup: PositionGroup
   number: number
   name: string
   rating: number
@@ -46,6 +58,8 @@ export interface MatchPlayer {
   yellow: number
   sentOff: boolean
   nextDecisionAt: number
+  /** Only meaningful for goalkeepers — see GkState. */
+  gkState: GkState
 }
 
 export interface Ball {
@@ -62,6 +76,16 @@ export interface Ball {
    * even though the ball may satisfy the "in range" test for several frames
    * while it closes in on goal. Reset whenever the ball is kicked afresh. */
   shotResolved: boolean
+  /** Who last kicked the ball, and from where — lets the loose-ball pickup
+   * check stop that same player from instantly re-claiming their own pass
+   * or clearance before it's actually travelled anywhere (a kick only
+   * covers a fraction of a unit in one 20ms frame, well inside the normal
+   * pickup radius, so without this a stationary kicker — a goalkeeper
+   * distributing is the clearest case — would catch their own kick back
+   * immediately, forever, instead of it ever reaching the pitch). */
+  kickerId: string | null
+  kickOriginX: number
+  kickOriginY: number
 }
 
 export interface MatchEvent {
